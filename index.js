@@ -18,16 +18,6 @@ const path = require('path');
 const { createCanvas, loadImage } = require('canvas');
 const { AttachmentBuilder } = require('discord.js');
 const { generatePoliceTableImage } = require('./policeTableImage');
-const { Client, GatewayIntentBits, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, Events, InteractionType, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
-const { REST } = require('@discordjs/rest');
-const { Routes } = require('discord-api-types/v10');
-require('dotenv').config({ path: './config.env' });
-const fs = require('fs');
-const path = require('path');
-const { createCanvas, loadImage } = require('canvas');
-const { AttachmentBuilder } = require('discord.js');
-const { generatePoliceTableImage } = require('./policeTableImage');
-
 // تحميل إعدادات اللوق
 function loadConfig() {
     try {
