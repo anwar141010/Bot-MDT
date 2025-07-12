@@ -235,7 +235,7 @@ function canUsePoliceFeature(interaction) {
 
 // دالة تسجيل الأوامر
 async function registerCommands() {
-    const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+    const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
     try {
         await rest.put(
             Routes.applicationCommands(process.env.CLIENT_ID),
