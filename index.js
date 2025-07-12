@@ -1,3 +1,23 @@
+const http = require('http');
+const PORT = process.env.PORT || 3000;
+
+http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('البوت يعمل!\n');
+}).listen(PORT, () => {
+  console.log(`HTTP server running on port ${PORT}`);
+});
+
+// باقي الأكواد كما هي
+const { Client, GatewayIntentBits, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, Events, InteractionType, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+const { REST } = require('@discordjs/rest');
+const { Routes } = require('discord-api-types/v10');
+require('dotenv').config({ path: './config.env' });
+const fs = require('fs');
+const path = require('path');
+const { createCanvas, loadImage } = require('canvas');
+const { AttachmentBuilder } = require('discord.js');
+const { generatePoliceTableImage } = require('./policeTableImage');
 const { Client, GatewayIntentBits, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, Events, InteractionType, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const { REST } = require('@discordjs/rest');
 const { Routes } = require('discord-api-types/v10');
