@@ -2513,11 +2513,11 @@ return;
             ctx.fillText(`تاريخ الميلاد : ${identity.day.padStart(2, '0')}/${convertArabicMonthToNumber(identity.month)}/${identity.year}`, 570, 150);
             ctx.fillText(`المدينة : ${identity.city}`, 570, 200);
             // إرسال الصورة
-            const buffer = canvas.toBuffer('image/png');
-            const attachment = new AttachmentBuilder(buffer, { name: 'my_id_card.png' });
-            await interaction.reply({ files: [attachment], ephemeral: true });
-            return;
-        }
+           const imageBuffer = canvas.toBuffer('image/png');
+const attachment2 = new AttachmentBuilder(imageBuffer, { name: 'my_id_card.png' });
+await interaction.reply({ files: [attachment2], ephemeral: true });
+return;
+        
         
         if (interaction.values[0] === 'my_national_id') {
             if (!identity) {
