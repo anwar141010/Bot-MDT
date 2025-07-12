@@ -1,0 +1,67 @@
+{
+  "3991": {
+    "fullName": "انور",
+    "gender": "ذكر",
+    "city": "ساندي شور",
+    "year": "1992",
+    "month": "مارس",
+    "day": "14",
+    "userId": "1337519808660639814",
+    "nationalId": "3991",
+    "policeCode": "M - 3",
+    "policeStatus": "end_shift"
+  },
+  "4479": {
+    "fullName": "انور عمي",
+    "gender": "ذكر",
+    "city": "ساندي شور",
+    "year": "2000",
+    "month": "يناير",
+    "day": "1",
+    "userId": "1040569141762986014",
+    "nationalId": "4479"
+  },
+  "6424": {
+    "fullName": "انس بن محمد",
+    "gender": "ذكر",
+    "city": "لوس سانتوس",
+    "year": "1999",
+    "month": "فبراير",
+    "day": "3",
+    "userId": "1380692257744617514",
+    "nationalId": "6424"
+  },
+  "6580": {
+    "fullName": "ابو خالد",
+    "gender": "ذكر",
+    "city": "لوس سانتوس",
+    "year": "2009",
+    "month": "مايو",
+    "day": "3",
+    "userId": "1337512375355707412",
+    "nationalId": "6580",
+    "policeCode": "P - 1",
+    "policeStatus": "login",
+    "points": 40
+  },
+  "7135": {
+    "fullName": "هتان العسيري",
+    "gender": "ذكر",
+    "city": "بوليتو",
+    "year": "2010",
+    "month": "فبراير",
+    "day": "3",
+    "userId": "1238478416445964342",
+    "nationalId": "7135"
+  },
+  "8580": {
+    "fullName": "تست",
+    "gender": "ذكر",
+    "city": "لوس سانتوس",
+    "year": "2000",
+    "month": "فبراير",
+    "day": "6",
+    "userId": "1327625196643029122",
+    "nationalId": "8580"
+  }
+}
