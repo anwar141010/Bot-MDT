@@ -1,0 +1,5 @@
+libcairo2
+libjpeg-turbo8
+libpango1.0-0
+libgif7
+libpng16-16
