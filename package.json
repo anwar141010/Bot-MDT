@@ -18,12 +18,12 @@
   ],
   "author": "MDT Team",
   "license": "MIT",
-  "dependencies": {
-    "canvas": "^2.11.2",
-    "discord.js": "^14.14.1",
-    "dotenv": "^16.6.1",
-    "fs": "^0.0.1-security"
-  },
+"dependencies": {
+  "discord.js": "^14.14.1",
+  "dotenv": "^16.6.1",
+  "fs": "^0.0.1-security",
+  "jimp": "^0.22.10"
+},
   "devDependencies": {
     "nodemon": "^3.0.2"
   },
