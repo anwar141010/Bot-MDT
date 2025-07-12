@@ -5137,7 +5137,7 @@ async function updatePoliceTableImages(guild) {
     }
 }
 
-client.login(process.env.DISCORD_TOKEN); 
+client.login(process.env.TOKEN); 
 
 // دالة مساعدة لإظهار إمبيد الحالة وقائمة المنسدلة
 async function showPoliceStatusEmbed(interaction, identity, status, isModal = false, isUpdate = false) {
