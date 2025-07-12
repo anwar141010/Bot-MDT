@@ -4775,7 +4775,7 @@ return;
         return;
     }
 
-});
+}
 
 // دالة إرسال لوق الجرائم والمخالفات
 function sendCrimeLog(interaction, action, personName, title, desc, months, fine, status = null, type = 'crime') {
