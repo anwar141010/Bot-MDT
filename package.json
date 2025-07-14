@@ -23,6 +23,7 @@
   "dotenv": "^16.6.1",
   "fs": "^0.0.1-security",
   "jimp": "^0.22.10"
+  "canvas": "^2.11.2"
 },
   "devDependencies": {
     "nodemon": "^3.0.2"
