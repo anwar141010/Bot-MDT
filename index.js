@@ -2272,10 +2272,1491 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 
     // التعامل مع زر رؤية المزيد من المخالفات
-    if (interaction.isButton() && interaction.customId.startsWith('view_more_violations_')) {
+const http = require('http');
+const PORT = process.env.PORT || 3000;
+
+http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('البوت يعمل!\n');
+}).listen(PORT, () => {
+  console.log(`HTTP server running on port ${PORT}`);
+});
+
+// باقي الأكواد كما هي
+const { Client, GatewayIntentBits, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, Events, InteractionType, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+const { REST } = require('@discordjs/rest');
+const { Routes } = require('discord-api-types/v10');
+require('dotenv').config({ path: './config.env' });
+const fs = require('fs');
+const path = require('path');
+const { createCanvas, loadImage } = require('canvas');
+const { AttachmentBuilder } = require('discord.js');
+const { generatePoliceTableImage } = require('./policeTableImage');
+// تحميل إعدادات اللوق
+function loadConfig() {
+    try {
+        const config = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
+        return config;
+    } catch {
+        return { logChannelId: '' };
+    }
+}
+function saveConfig(config) {
+    fs.writeFileSync(path.join(__dirname, 'config.json'), JSON.stringify(config, null, 2));
+}
+
+// تحميل الهويات
+function loadIdentities() {
+    try {
+        return JSON.parse(fs.readFileSync(path.join(__dirname, 'identities.json'), 'utf8'));
+    } catch {
+        return {};
+    }
+}
+function saveIdentities(data) {
+    fs.writeFileSync(path.join(__dirname, 'identities.json'), JSON.stringify(data, null, 2));
+}
+
+// تحميل الجرائم
+function loadCrimes() {
+    try {
+        return JSON.parse(fs.readFileSync(path.join(__dirname, 'crimes.json'), 'utf8'));
+    } catch {
+        return {};
+    }
+}
+function saveCrimes(data) {
+    fs.writeFileSync(path.join(__dirname, 'crimes.json'), JSON.stringify(data, null, 2));
+}
+
+// تحميل المخالفات
+function loadViolations() {
+    try {
+        return JSON.parse(fs.readFileSync(path.join(__dirname, 'violations.json'), 'utf8'));
+    } catch {
+        return {};
+    }
+}
+function saveViolations(data) {
+    fs.writeFileSync(path.join(__dirname, 'violations.json'), JSON.stringify(data, null, 2));
+}
+
+// تحميل وحفظ حالة البريميوم
+function loadPremium() {
+    try {
+        return JSON.parse(fs.readFileSync(path.join(__dirname, 'premium.json'), 'utf8'));
+    } catch {
+        return {};
+    }
+}
+function savePremium(data) {
+    fs.writeFileSync(path.join(__dirname, 'premium.json'), JSON.stringify(data, null, 2));
+}
+
+// تحميل وحفظ إعدادات حقوق Wonder Bot
+function loadRightsConfig() {
+    try {
+        return JSON.parse(fs.readFileSync(path.join(__dirname, 'rights_config.json'), 'utf8'));
+    } catch {
+        return {
+            enabled: true,
+            buttonText: 'حقوق Wonder Bot',
+            buttonUrl: 'https://discord.gg/95jJ8EnK',
+            hidden: false
+        };
+    }
+}
+function saveRightsConfig(data) {
+    fs.writeFileSync(path.join(__dirname, 'rights_config.json'), JSON.stringify(data, null, 2));
+}
+let rightsConfig = loadRightsConfig();
+let premium = loadPremium();
+
+let config = loadConfig();
+let identities = loadIdentities();
+let crimes = loadCrimes();
+let violations = loadViolations();
+
+// قائمة آيدي المطورين
+const OWNER_IDS = [
+    '1337512375355707412', // آيدي المطور الأول
+    '1070609053065154631', // آيدي المطور الثاني  
+    '1291805249815711826', // آيدي المطور الثالث
+    '1319791882389164072'  // آيدي المطور الرابع
+];
+
+// حالة البوت في كل سيرفر
+let botStatus = new Map(); // serverId => { status: 'online' | 'offline', customImage: string }
+
+// تحميل حالة البوت
+function loadBotStatus() {
+    try {
+        const data = JSON.parse(fs.readFileSync(path.join(__dirname, 'bot_status.json'), 'utf8'));
+        botStatus = new Map(Object.entries(data));
+    } catch {
+        botStatus = new Map();
+    }
+}
+
+// حفظ حالة البوت
+function saveBotStatus() {
+    const data = Object.fromEntries(botStatus);
+    fs.writeFileSync(path.join(__dirname, 'bot_status.json'), JSON.stringify(data, null, 2));
+}
+
+// تحميل حالة البوت عند بدء التشغيل
+loadBotStatus(); 
+
+// تعريف الكلاينت
+const client = new Client({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildMessageReactions,
+        GatewayIntentBits.DirectMessages
+    ]
+});
+
+const IMAGE_URL = 'https://media.discordapp.net/attachments/1303476251746504726/1388435070141861918/Clean_20250626_130356_.png?ex=686ed02c&is=686d7eac&hm=f24f84fada334662ac50955484efe0e59e7684e845394662e7958effb7efe80a&=&format=webp&quality=lossless';
+
+// تعريف الأوامر الأساسية
+const identityCommand = {
+    name: 'هوية',
+    description: 'إنشاء هوية',
+    type: 1
+};
+
+const myIdentityCommand = {
+    name: 'شخصيتي',
+    description: 'عرض معلومات هويتك الوطنية',
+    type: 1
+};
+
+const ownerCommand = {
+    name: 'الاونر',
+    description: 'أوامر خاصة بالمطورين',
+    type: 1
+};
+
+const policeCommand = {
+    name: 'شرطة',
+    description: 'أمر الشرطة',
+    type: 1
+};
+
+const customizeCommand = {
+    name: 'تخصيص',
+    description: 'تخصيص إعدادات البوت (Admins only)',
+    type: 1
+};
+
+const systemCommand = {
+    name: 'النضام',
+    description: 'نظام نقاط الشرطة',
+    type: 1
+};
+
+// دالة تحويل أسماء الشهور العربية إلى أرقام
+function convertArabicMonthToNumber(monthName) {
+    if (!monthName) return '00';
+    
+    const monthMap = {
+        'يناير': '01',
+        'فبراير': '02',
+        'فبراير': '02', // تصحيح للكتابة الخاطئة
+        'مارس': '03',
+        'أبريل': '04',
+        'مايو': '05',
+        'يونيو': '06',
+        'يوليو': '07',
+        'أغسطس': '08',
+        'سبتمبر': '09',
+        'أكتوبر': '10',
+        'نوفمبر': '11',
+        'ديسمبر': '12'
+    };
+    
+    // إذا كان الشهر رقم بالفعل، نعيده كما هو
+    if (/^\d{1,2}$/.test(monthName)) {
+        return monthName.padStart(2, '0');
+    }
+    
+    return monthMap[monthName] || monthName;
+}
+
+// دوال مساعدة للصلاحيات والصور
+function isBotOffline(guildId) {
+    const status = botStatus.get(guildId);
+    return status && status.status === 'offline';
+}
+
+function getCustomImage(guildId) {
+    const status = botStatus.get(guildId);
+    return status && status.customImage ? status.customImage : IMAGE_URL;
+}
+
+function hasPoliceAdminRole(member) {
+    if (!config.policeAdminRoleId) return false;
+    return member.roles.cache.has(config.policeAdminRoleId);
+}
+
+function canUsePoliceFeature(interaction) {
+    // تحقق من الهوية
+    const identity = Object.values(identities).find(id => id.userId === interaction.user.id);
+    if (!identity) {
+        interaction.reply({ content: '❌ يجب أن يكون لديك هوية لاستعمال ال ام دي تي العسكري', ephemeral: true });
+        return false;
+    }
+    // تحقق من الرتبة العسكرية
+    if (config.militaryRoleId && !interaction.member.roles.cache.has(config.militaryRoleId)) {
+        interaction.reply({ content: '❌ يجب أن تكون عسكري لاستعمال ال ام دي تي العسكري', ephemeral: true });
+        return false;
+    }
+    return identity;
+} 
+
+// دالة تسجيل الأوامر
+async function registerCommands() {
+    const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
+    try {
+        await rest.put(
+            Routes.applicationCommands(process.env.CLIENT_ID),
+            { body: [identityCommand, customizeCommand, myIdentityCommand, ownerCommand, policeCommand, systemCommand] }
+        );
+    } catch (error) {
+        console.error('خطأ في تسجيل الأوامر:', error);
+    }
+}
+
+client.once('ready', () => {
+    console.log(`✅ البوت متصل بنجاح!`);
+    registerCommands();
+}); 
+
+// متغيرات لحفظ بيانات المستخدمين مؤقتًا
+const userData = new Map(); // لحفظ بيانات كل مستخدم مؤقتًا
+const userNationalIds = new Map(); // حفظ الأرقام الوطنية لكل مستخدم
+
+// دالة مساعدة لإضافة خيار إعادة تعيين في نهاية أي قائمة
+function withResetOption(options) {
+    // إزالة أي خيار إعادة تعيين سابق
+    const filtered = options.filter(opt => opt.value !== 'reset');
+    return [
+        ...filtered,
+        { label: 'إعادة تعيين', value: 'reset' }
+    ];
+}
+
+// دالة إنشاء زر حقوق Wonder Bot
+function createRightsButton() {
+    if (!rightsConfig.enabled || rightsConfig.hidden) {
+        return null;
+    }
+    
+    return new ButtonBuilder()
+        .setLabel(rightsConfig.buttonText)
+        .setURL(rightsConfig.buttonUrl)
+        .setStyle(ButtonStyle.Link);
+}
+
+// دالة توليد رقم وطني فريد
+function generateNationalId() {
+    return Math.floor(1000 + Math.random() * 9000).toString();
+}
+
+// دالة تحقق اكتمال البيانات
+function isIdentityComplete(data) {
+    return data.fullName && data.gender && data.city && data.year && data.month && data.day;
+}
+
+// دالة بناء الأزرار حسب حالة البيانات
+function buildStepButtons(data) {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId('set_full_name')
+            .setLabel('الاسم الكامل')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(!!data.fullName),
+        new ButtonBuilder()
+            .setCustomId('set_gender')
+            .setLabel('الجنس')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(!data.fullName || !!data.gender),
+        new ButtonBuilder()
+            .setCustomId('set_city')
+            .setLabel('مكان الولادة')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(!data.gender || !!data.city),
+        new ButtonBuilder()
+            .setCustomId('set_birthdate')
+            .setLabel('تاريخ الميلاد')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(!data.city || !!(data.year && data.month && data.day)),
+        new ButtonBuilder()
+            .setCustomId('finish_identity')
+            .setLabel('إنهاء')
+            .setStyle(ButtonStyle.Success)
+            .setDisabled(!isIdentityComplete(data))
+    );
+} 
+
+    // التعامل مع الأحداث
+    client.on(Events.InteractionCreate, async interaction => {
+        console.log('Interaction received:', interaction.type, interaction.customId || interaction.commandName);
+        
+    // أمر /هوية (Admins only)
+    if (interaction.type === InteractionType.ApplicationCommand && interaction.commandName === 'هوية') {
+        // المطورين يمكنهم استخدام جميع الأوامر حتى لو كان البوت متوقف
+        if (!OWNER_IDS.includes(interaction.user.id)) {
+            if (!interaction.member.permissions.has('Administrator')) {
+                await interaction.reply({ content: '❌ هذا الأمر متاح فقط للأدمن.', ephemeral: true });
+                return;
+            }
+            
+            // التحقق من حالة البوت
+            if (isBotOffline(interaction.guildId)) {
+                await interaction.reply({ 
+                    content: '❌ البوت حالياً متوقف من قبل المطورين يرجى التواصل مع أحد المطورين <@1337512375355707412> <@1070609053065154631> <@1291805249815711826>', 
+                    ephemeral: true 
+                });
+                return;
+            }
+        }
+        // أزرار مفعلة للجميع دائمًا
+        userData.set(interaction.user.id, { fullName: null, gender: null, city: null, year: null, month: null, day: null });
+        const embed = new EmbedBuilder()
+            .setTitle('من هنا تنشئ هويتك الوطنية')
+            .setDescription('يرجى تعبئة جميع البيانات عبر الأزرار أدناه:')
+            .setColor('#0099ff')
+            .setImage(getCustomImage(interaction.guildId));
+        
+        const row = buildStepButtons({});
+        const rightsButton = createRightsButton();
+        
+        let components = [row];
+        if (rightsButton) {
+            const rightsRow = new ActionRowBuilder().addComponents(rightsButton);
+            components.push(rightsRow);
+        }
+        
+        await interaction.reply({ embeds: [embed], components: components });
+        return;
+    }
+
+    // أزرار الهوية
+    if (interaction.isButton()) {
+                const userId = interaction.user.id;
+        
+        // المطورين يمكنهم استخدام جميع الأوامر حتى لو كان البوت متوقف
+        if (!OWNER_IDS.includes(interaction.user.id)) {
+            // التحقق من حالة البوت
+            if (isBotOffline(interaction.guildId)) {
+                await interaction.reply({ 
+                    content: '❌ البوت حالياً متوقف من قبل المطورين يرجى التواصل مع أحد المطورين <@1337512375355707412> <@1070609053065154631> <@1291805249815711826>', 
+                    ephemeral: true 
+                });
+                    return;
+            }
+        }
+        
+        // تحقق فقط إذا كان الزر من أزرار إنشاء الهوية للمستخدم
+        const creationButtons = [
+            'set_full_name', 'set_gender', 'set_city', 'set_birthdate', 'finish_identity'
+        ];
+        if (creationButtons.includes(interaction.customId)) {
+            const hasIdentity = Object.values(identities).some(id => id.userId === userId);
+            if (hasIdentity) {
+                await interaction.reply({
+                    content: 'لديك هوية بالفعل، لا يمكن إنشاء هوية أخرى أو تعديل على الهوية.',
+                    ephemeral: true
+                });
+                return;
+            }
+        }
+        
+        const data = userData.get(userId) || { fullName: null, gender: null, city: null, year: null, month: null, day: null };
+        
+        if (interaction.customId === 'set_full_name') {
+            const modal = new ModalBuilder()
+                .setCustomId('modal_full_name')
+                .setTitle('الاسم الكامل')
+                .addComponents(
+                    new ActionRowBuilder().addComponents(
+                        new TextInputBuilder()
+                            .setCustomId('full_name')
+                            .setLabel('أدخل اسمك الكامل')
+                            .setStyle(TextInputStyle.Short)
+                            .setRequired(true)
+                    )
+                );
+            await interaction.showModal(modal);
+            return;
+        }
+        
+        if (interaction.customId === 'set_gender') {
+            const genderMenu = new StringSelectMenuBuilder()
+                .setCustomId('select_gender')
+                .setPlaceholder('اختر الجنس')
+                .addOptions(withResetOption([
+                    { label: 'ذكر', value: 'ذكر' },
+                    { label: 'أنثى', value: 'أنثى' }
+                ]));
+            const row = new ActionRowBuilder().addComponents(genderMenu);
+            await interaction.reply({ content: 'اختر الجنس:', components: [row], ephemeral: true });
+            return;
+        }
+        
+        if (interaction.customId === 'set_city') {
+            const cityMenu = new StringSelectMenuBuilder()
+                .setCustomId('select_city')
+                .setPlaceholder('اختر مكان الولادة')
+                .addOptions(withResetOption([
+                    { label: 'لوس سانتوس', value: 'لوس سانتوس' },
+                    { label: 'بوليتو', value: 'بوليتو' },
+                    { label: 'ساندي شور', value: 'ساندي شور' }
+                ]));
+            const row = new ActionRowBuilder().addComponents(cityMenu);
+            await interaction.reply({ content: 'اختر مكان الولادة:', components: [row], ephemeral: true });
+            return;
+        }
+        
+        if (interaction.customId === 'set_birthdate') {
+            // قائمة السنوات
+            const years = Array.from({ length: 24 }, (_, i) => 1990 + i);
+            const yearMenu = new StringSelectMenuBuilder()
+                .setCustomId('select_year')
+                .setPlaceholder('اختر سنة الميلاد')
+                .addOptions(withResetOption(years.map(y => ({ label: y.toString(), value: y.toString() }))));
+            const row = new ActionRowBuilder().addComponents(yearMenu);
+            await interaction.reply({ content: 'اختر سنة الميلاد:', components: [row], ephemeral: true });
+            return;
+        }
+        
+        if (interaction.customId === 'finish_identity') {
+            if (!isIdentityComplete(data)) {
+                await interaction.reply({ content: 'يرجى تعبئة جميع البيانات أولاً.', ephemeral: true });
+                return;
+            }
+            // حفظ الهوية
+            const nationalId = generateNationalId();
+            identities[nationalId] = { ...data, userId, nationalId };
+            saveIdentities(identities);
+            // إرسال للوق
+            const logChannel = config.logChannelId && interaction.guild.channels.cache.get(config.logChannelId);
+            if (logChannel) {
+                const embed = new EmbedBuilder()
+                    .setTitle('بطاقة هوية جديدة')
+                    .setColor('#0099ff')
+                    .setImage(IMAGE_URL)
+                    .addFields(
+                        { name: 'الاسم الكامل', value: data.fullName, inline: false },
+                        { name: 'الجنس', value: data.gender, inline: true },
+                        { name: 'تاريخ الميلاد', value: `${data.day.padStart(2, '0')}/${convertArabicMonthToNumber(data.month)}/${data.year}`, inline: true },
+                        { name: 'مكان الولادة', value: data.city, inline: true },
+                        { name: 'الرقم الوطني', value: nationalId, inline: true },
+                        { name: 'أنشئت بواسطة', value: `<@${userId}>`, inline: false }
+                    )
+                    .setTimestamp();
+                await logChannel.send({ embeds: [embed] });
+            }
+            // الرد بشكل مؤجل
+            await interaction.deferReply({ ephemeral: true });
+            // إرسال DM بعد الرد
+            try {
+                await interaction.user.send(`تم إنشاء هويتك بنجاح! رقم هويتك الوطني: **${nationalId}**`);
+            } catch {}
+            await interaction.editReply({ content: '✅ تم إنشاء الهوية بنجاح!' });
+            userData.delete(userId);
+            return;
+        }
+        
+        // التعامل مع زر الأيام 25-31
+        if (interaction.customId === 'more_days') {
+            const userId = interaction.user.id;
+            const data = userData.get(userId) || {};
+            
+            const moreDays = Array.from({ length: 7 }, (_, i) => (i + 25).toString());
+            const dayMenu = new StringSelectMenuBuilder()
+                .setCustomId('select_day')
+                .setPlaceholder('اختر يوم الميلاد (25-31)')
+                .addOptions(withResetOption(moreDays.map(d => ({ label: d, value: d }))));
+            const row = new ActionRowBuilder().addComponents(dayMenu);
+            
+            // زر العودة للأيام 1-24
+            const backButton = new ButtonBuilder()
+                .setCustomId('back_to_days_1_24')
+                .setLabel('الأيام 1-24')
+                .setStyle(ButtonStyle.Secondary);
+            const buttonRow = new ActionRowBuilder().addComponents(backButton);
+            
+            await interaction.update({ 
+                content: 'اختر يوم الميلاد:', 
+                components: [row, buttonRow], 
+                ephemeral: true 
+            });
+            return;
+        }
+        
+        // التعامل مع زر العودة للأيام 1-24
+        if (interaction.customId === 'back_to_days_1_24') {
+            const userId = interaction.user.id;
+            const data = userData.get(userId) || {};
+            
+            const days = Array.from({ length: 24 }, (_, i) => (i + 1).toString());
+            const dayMenu = new StringSelectMenuBuilder()
+                .setCustomId('select_day')
+                .setPlaceholder('اختر يوم الميلاد (1-24)')
+                .addOptions(withResetOption(days.map(d => ({ label: d, value: d }))));
+            const row = new ActionRowBuilder().addComponents(dayMenu);
+            
+            // إضافة زر للوصول للأيام 25-31
+            const moreDaysButton = new ButtonBuilder()
+                .setCustomId('more_days')
+                .setLabel('الأيام 25-31')
+                .setStyle(ButtonStyle.Secondary);
+            const buttonRow = new ActionRowBuilder().addComponents(moreDaysButton);
+            
+            await interaction.update({ 
+                content: 'اختر يوم الميلاد:', 
+                components: [row, buttonRow], 
+                ephemeral: true 
+            });
+            return;
+        }
+    }
+
+    // استقبال مودال تعديل الهوية
+    if (interaction.type === InteractionType.ModalSubmit && interaction.customId === 'edit_identity_modal') {
+        const userId = interaction.user.id;
+        const userDataEntry = userData.get(userId);
+        
+        if (!userDataEntry || !userDataEntry.editingMode) {
+            await interaction.reply({ content: '❌ خطأ في عملية التعديل.', ephemeral: true });
+            return;
+        }
+        
+        const fullName = interaction.fields.getTextInputValue('edit_full_name');
+        const gender = interaction.fields.getTextInputValue('edit_gender');
+        const city = interaction.fields.getTextInputValue('edit_city');
+        const birthdate = interaction.fields.getTextInputValue('edit_birthdate');
+        
+        // تحليل تاريخ الميلاد
+        const birthdateParts = birthdate.split('/');
+        if (birthdateParts.length !== 3) {
+            await interaction.reply({ content: '❌ تنسيق تاريخ الميلاد غير صحيح. استخدم: يوم/شهر/سنة', ephemeral: true });
+            return;
+        }
+        
+        const [day, month, year] = birthdateParts;
+        
+        // تحديث الهوية
+        const nationalId = userDataEntry.editingNationalId;
+        identities[nationalId] = {
+            ...identities[nationalId],
+            fullName,
+            gender,
+            city,
+            day,
+            month,
+            year
+        };
+        
+        saveIdentities(identities);
+        
+        // إزالة بيانات التعديل
+        userData.delete(userId);
+        
+        await interaction.reply({ 
+            content: `✅ تم تعديل هوية **${fullName}** بنجاح!`, 
+            ephemeral: true 
+        });
+        return;
+    }
+
+    // استقبال مودال الاسم الكامل
+    if (interaction.type === InteractionType.ModalSubmit && interaction.customId === 'modal_full_name') {
+        const userId = interaction.user.id;
+        
+        // المطورين يمكنهم استخدام جميع الأوامر حتى لو كان البوت متوقف
+        if (!OWNER_IDS.includes(interaction.user.id)) {
+            // التحقق من حالة البوت
+            if (isBotOffline(interaction.guildId)) {
+                await interaction.reply({ 
+                    content: '❌ البوت حالياً متوقف من قبل المطورين يرجى التواصل مع أحد المطورين <@1337512375355707412> <@1070609053065154631> <@1291805249815711826>', 
+                    ephemeral: true 
+                });
+                return;
+            }
+        }
+        
+        const data = userData.get(userId) || {};
+        data.fullName = interaction.fields.getTextInputValue('full_name');
+                userData.set(userId, data);
+        await interaction.reply({
+            content: 'أكمل الخطوة التالية:',
+            ephemeral: true,
+            components: [buildStepButtons(data)]
+        });
+        return;
+    }
+
+    // استقبال القوائم المنسدلة
+    if (interaction.isStringSelectMenu()) {
+        const userId = interaction.user.id;
+        
+        // المطورين يمكنهم استخدام جميع الأوامر حتى لو كان البوت متوقف
+        if (!OWNER_IDS.includes(interaction.user.id)) {
+            // التحقق من حالة البوت
+            if (isBotOffline(interaction.guildId)) {
+                await interaction.reply({ 
+                    content: '❌ البوت حالياً متوقف من قبل المطورين يرجى التواصل مع أحد المطورين <@1337512375355707412> <@1070609053065154631> <@1291805249815711826>', 
+                    ephemeral: true 
+                });
+                return;
+            }
+        }
+        
+        const data = userData.get(userId) || {};
+        
+        if (interaction.customId === 'select_gender') {
+            if (interaction.values[0] === 'reset') {
+                data.gender = null;
+            } else {
+                data.gender = interaction.values[0];
+            }
+            userData.set(userId, data);
+            await interaction.update({
+                content: 'أكمل الخطوة التالية:',
+                ephemeral: true,
+                components: [buildStepButtons(data)]
+            });
+            return;
+        }
+        
+        if (interaction.customId === 'select_city') {
+            if (interaction.values[0] === 'reset') {
+                data.city = null;
+            } else {
+                data.city = interaction.values[0];
+            }
+            userData.set(userId, data);
+            await interaction.update({
+                content: 'أكمل الخطوة التالية:',
+                ephemeral: true,
+                components: [buildStepButtons(data)]
+            });
+            return;
+        }
+        
+        if (interaction.customId === 'select_year') {
+            if (interaction.values[0] === 'reset') {
+                data.year = null;
+                data.month = null;
+                data.day = null;
+                userData.set(userId, data);
+                await interaction.update({
+                    content: 'أكمل الخطوة التالية:',
+                    ephemeral: true,
+                    components: [buildStepButtons(data)]
+                });
+                return;
+            } else {
+                data.year = interaction.values[0];
+                userData.set(userId, data);
+                // بعد اختيار السنة، نطلب الشهر
+                const months = [
+                    { label: 'يناير', value: 'يناير' },
+                    { label: 'فبراير', value: 'فبراير' },
+                    { label: 'مارس', value: 'مارس' },
+                    { label: 'أبريل', value: 'أبريل' },
+                    { label: 'مايو', value: 'مايو' },
+                    { label: 'يونيو', value: 'يونيو' },
+                    { label: 'يوليو', value: 'يوليو' },
+                    { label: 'أغسطس', value: 'أغسطس' },
+                    { label: 'سبتمبر', value: 'سبتمبر' },
+                    { label: 'أكتوبر', value: 'أكتوبر' },
+                    { label: 'نوفمبر', value: 'نوفمبر' },
+                    { label: 'ديسمبر', value: 'ديسمبر' }
+                ];
+                const monthMenu = new StringSelectMenuBuilder()
+                    .setCustomId('select_month')
+                    .setPlaceholder('اختر شهر الميلاد')
+                    .addOptions(withResetOption(months));
+                const row = new ActionRowBuilder().addComponents(monthMenu);
+                await interaction.update({ content: 'اختر شهر الميلاد:', components: [row], ephemeral: true });
+                return;
+            }
+        }
+        
+        if (interaction.customId === 'select_month') {
+            if (interaction.values[0] === 'reset') {
+                data.month = null;
+                data.day = null;
+                userData.set(userId, data);
+                await interaction.update({
+                    content: 'أكمل الخطوة التالية:',
+                    ephemeral: true,
+                    components: [buildStepButtons(data)]
+                });
+                return;
+            } else {
+                data.month = interaction.values[0];
+                userData.set(userId, data);
+                // بعد اختيار الشهر، نطلب اليوم
+                const days = Array.from({ length: 24 }, (_, i) => (i + 1).toString());
+                const dayMenu = new StringSelectMenuBuilder()
+                    .setCustomId('select_day')
+                    .setPlaceholder('اختر يوم الميلاد (1-24)')
+                    .addOptions(withResetOption(days.map(d => ({ label: d, value: d }))));
+                const row = new ActionRowBuilder().addComponents(dayMenu);
+                
+                // إضافة زر للوصول للأيام 25-31
+                const moreDaysButton = new ButtonBuilder()
+                    .setCustomId('more_days')
+                    .setLabel('الأيام 25-31')
+                    .setStyle(ButtonStyle.Secondary);
+                const buttonRow = new ActionRowBuilder().addComponents(moreDaysButton);
+                
+                await interaction.update({ 
+                    content: 'اختر يوم الميلاد:', 
+                    components: [row, buttonRow], 
+                    ephemeral: true 
+                });
+                return;
+            }
+        }
+        
+        if (interaction.customId === 'select_day') {
+            if (interaction.values[0] === 'reset') {
+                data.day = null;
+                userData.set(userId, data);
+                await interaction.update({
+                    content: 'أكمل الخطوة التالية:',
+                    ephemeral: true,
+                    components: [buildStepButtons(data)]
+                });
+                return;
+            } else {
+                data.day = interaction.values[0];
+                userData.set(userId, data);
+                await interaction.reply({
+                    content: 'أكمل الخطوة التالية:',
+                    ephemeral: true,
+                    components: [buildStepButtons(data)]
+                });
+                return;
+            }
+        }
+    }
+
+    // أمر /تخصيص (Admins only)
+    if (interaction.type === InteractionType.ApplicationCommand && interaction.commandName === 'تخصيص') {
+        // المطورين يمكنهم استخدام جميع الأوامر حتى لو كان البوت متوقف
+        if (!OWNER_IDS.includes(interaction.user.id)) {
+            if (!interaction.member.permissions.has('Administrator')) {
+                await interaction.reply({ content: '❌ هذا الأمر متاح فقط للأدمن.', ephemeral: true });
+                return;
+            }
+            
+            // التحقق من حالة البوت
+            if (isBotOffline(interaction.guildId)) {
+                await interaction.reply({ 
+                    content: '❌ البوت حالياً متوقف من قبل المطورين يرجى التواصل مع أحد المطورين <@1337512375355707412> <@1070609053065154631> <@1291805249815711826>', 
+                    ephemeral: true 
+                });
+                return;
+            }
+        }
+        // Embed مع صورة الهوية
+                const embed = new EmbedBuilder()
+            .setTitle('لوحة التخصيص')
+            .setDescription('اختر إجراء من القائمة أدناه:')
+            .setColor('#f1c40f')
+            .setImage(getCustomImage(interaction.guildId));
+        // قائمة منسدلة فيها خيارين
+        const selectMenu = new StringSelectMenuBuilder()
+            .setCustomId('customize_select')
+            .setPlaceholder('اختر إجراء')
+            .addOptions([
+                { label: 'تعيين لوق الهوية', value: 'set_log' },
+                { label: 'تعيين لوق الجرائم', value: 'set_crimes_log' },
+                { label: 'تعيين روم مباشرة العسكر', value: 'set_direct_military_room' },
+                { label: 'تعيين روم لوق الشرطة', value: 'set_police_log_room' },
+                { label: 'حذف هوية & تعديل هوية', value: 'delete_identity' },
+                { label: 'إضافة رتبة عسكرية', value: 'set_military_role' },
+                { label: 'إضافة رتبة مسؤول الشرطة', value: 'set_police_admin_role' },
+                { label: 'رؤية التعديلات', value: 'view_settings' },
+                { label: 'إعادة تعيين', value: 'reset' }
+            ]);
+        const row = new ActionRowBuilder().addComponents(selectMenu);
+        await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+        return;
+    }
+
+    // التعامل مع أزرار "رؤية المزيد" للهويات
+    if (interaction.isButton() && interaction.customId.startsWith('view_more_identities_')) {
+        const pageNumber = parseInt(interaction.customId.split('_')[3]);
+        const identityOptions = Object.values(identities).map(id => ({
+            label: id.fullName,
+            value: id.nationalId
+        }));
+        
+        const pageSize = 24;
+        const totalPages = Math.ceil(identityOptions.length / pageSize);
+        const startIndex = pageNumber * pageSize;
+        const endIndex = Math.min(startIndex + pageSize, identityOptions.length);
+        const pageOptions = identityOptions.slice(startIndex, endIndex);
+        
+        const selectMenu = new StringSelectMenuBuilder()
+            .setCustomId(`select_identity_to_manage_page_${pageNumber}`)
+            .setPlaceholder('اختر هوية')
+            .addOptions(pageOptions);
+        
+        const row = new ActionRowBuilder().addComponents(selectMenu);
+        
+        let components = [row];
+        if (endIndex < identityOptions.length) {
+            const moreButton = new ButtonBuilder()
+                .setCustomId(`view_more_identities_${pageNumber + 1}`)
+                .setLabel('رؤية المزيد')
+                .setStyle(ButtonStyle.Secondary);
+            const buttonRow = new ActionRowBuilder().addComponents(moreButton);
+            components.push(buttonRow);
+        }
+        
+        const embed = new EmbedBuilder()
+            .setTitle('حذف أو تعديل هوية')
+            .setDescription(`اختر هوية من القائمة لإدارتها (الصفحة ${pageNumber + 1} من ${totalPages})`)
+            .setColor('#e74c3c')
+            .setImage(getCustomImage(interaction.guildId));
+        
+        await interaction.update({ embeds: [embed], components: components, ephemeral: true });
+        return;
+    }
+
+    // التعامل مع أزرار "رؤية المزيد" للعسكريين
+    if (interaction.isButton() && interaction.customId.startsWith('view_more_military_')) {
+        // تحقق من البريميوم
+        if (!premium[interaction.guildId]) {
+            await interaction.reply({ 
+                content: '❌ هذا الأمر اشتراك بريميوم يرجى التواصل مع أحد المطورين للاشتراك:\n<@1337512375355707412> <@1070609053065154631> <@1291805249815711826> <@1319791882389164072>', 
+                ephemeral: true 
+            });
+            return;
+        }
+        
+        const pageNumber = parseInt(interaction.customId.split('_')[3]);
+        const militaryMembers = Object.values(identities).filter(id => id.policeCode);
+        
+        const pageSize = 24;
+        const totalPages = Math.ceil(militaryMembers.length / pageSize);
+        const startIndex = pageNumber * pageSize;
+        const endIndex = Math.min(startIndex + pageSize, militaryMembers.length);
+        const pageMembers = militaryMembers.slice(startIndex, endIndex);
+        
+        const memberOptions = pageMembers.map(member => ({
+            label: `${member.fullName} (${member.policeCode})`,
+            value: member.nationalId,
+            description: `نقاط: ${member.points || 0}`
+        }));
+        
+        const selectMenu = new StringSelectMenuBuilder()
+            .setCustomId(`manage_military_member_page_${pageNumber}`)
+            .setPlaceholder('اختر عسكري لإدارته')
+            .addOptions(memberOptions);
+        
+        const row = new ActionRowBuilder().addComponents(selectMenu);
+        
+        let components = [row];
+        if (endIndex < militaryMembers.length) {
+            const moreButton = new ButtonBuilder()
+                .setCustomId(`view_more_military_${pageNumber + 1}`)
+                .setLabel('رؤية المزيد')
+                .setStyle(ButtonStyle.Secondary);
+            const buttonRow = new ActionRowBuilder().addComponents(moreButton);
+            components.push(buttonRow);
+        }
+        
+        const embed = new EmbedBuilder()
+            .setTitle('إدارة العسكريين')
+            .setDescription(`اختر عسكري من القائمة لإدارته (الصفحة ${pageNumber + 1} من ${totalPages})`)
+            .setColor('#e74c3c')
+            .setImage(getCustomImage(interaction.guildId));
+        
+        await interaction.update({ embeds: [embed], components: components, ephemeral: true });
+        return;
+    }
+
+    // التعامل مع أزرار "رؤية المزيد" للنقاط
+    if (interaction.isButton() && interaction.customId.startsWith('view_more_points_')) {
+        // تحقق من البريميوم
+        if (!premium[interaction.guildId]) {
+            await interaction.reply({ 
+                content: '❌ هذا الأمر اشتراك بريميوم يرجى التواصل مع أحد المطورين للاشتراك:\n<@1337512375355707412> <@1070609053065154631> <@1291805249815711826> <@1319791882389164072>', 
+                ephemeral: true 
+            });
+            return;
+        }
+        
+        const pageNumber = parseInt(interaction.customId.split('_')[3]);
+        const militaryMembers = Object.values(identities).filter(id => id.policeCode);
+        
+        const pageSize = 24;
+        const totalPages = Math.ceil(militaryMembers.length / pageSize);
+        const startIndex = pageNumber * pageSize;
+        const endIndex = Math.min(startIndex + pageSize, militaryMembers.length);
+        const pageMembers = militaryMembers.slice(startIndex, endIndex);
+        
+        const memberOptions = pageMembers.map(member => ({
+            label: `${member.fullName} (${member.policeCode})`,
+            value: member.nationalId,
+            description: `نقاط: ${member.points || 0}`
+        }));
+        
+        const selectMenu = new StringSelectMenuBuilder()
+            .setCustomId(`manage_points_member_page_${pageNumber}`)
+            .setPlaceholder('اختر عسكري لإدارة نقاطه')
+            .addOptions(memberOptions);
+        
+        const row = new ActionRowBuilder().addComponents(selectMenu);
+        
+        let components = [row];
+        if (endIndex < militaryMembers.length) {
+            const moreButton = new ButtonBuilder()
+                .setCustomId(`view_more_points_${pageNumber + 1}`)
+                .setLabel('رؤية المزيد')
+                .setStyle(ButtonStyle.Secondary);
+            const buttonRow = new ActionRowBuilder().addComponents(moreButton);
+            components.push(buttonRow);
+        }
+        
+        const embed = new EmbedBuilder()
+            .setTitle('إدارة النقاط')
+            .setDescription(`اختر عسكري من القائمة لإدارة نقاطه (الصفحة ${pageNumber + 1} من ${totalPages})`)
+            .setColor('#f39c12')
+            .setImage(getCustomImage(interaction.guildId));
+        
+        await interaction.update({ embeds: [embed], components: components, ephemeral: true });
+        return;
+    }
+
+    // التعامل مع القائمة المنسدلة في /تخصيص
+    if (interaction.isStringSelectMenu() && interaction.customId === 'customize_select') {
+        if (interaction.values[0] === 'set_log') {
+            // مودال تعيين لوق الهوية
+            const modal = new ModalBuilder()
+                .setCustomId('customize_log_modal')
+                .setTitle('تعيين لوق الهوية')
+                .addComponents(
+                    new ActionRowBuilder().addComponents(
+                        new TextInputBuilder()
+                            .setCustomId('log_channel_id')
+                            .setLabel('أدخل آيدي قناة اللوق')
+                            .setStyle(TextInputStyle.Short)
+                            .setRequired(true)
+                    )
+                );
+            await interaction.showModal(modal);
+            return;
+        }
+        
+        if (interaction.values[0] === 'set_crimes_log') {
+            // مودال تعيين لوق الجرائم
+            const modal = new ModalBuilder()
+                .setCustomId('set_crimes_log_modal')
+                .setTitle('تعيين لوق الجرائم')
+                .addComponents(
+                    new ActionRowBuilder().addComponents(
+                        new TextInputBuilder()
+                            .setCustomId('crimes_log_channel_id')
+                            .setLabel('أدخل آيدي قناة لوق الجرائم')
+                            .setStyle(TextInputStyle.Short)
+                            .setRequired(true)
+                    )
+                );
+            await interaction.showModal(modal);
+            return;
+        }
+        
+        if (interaction.values[0] === 'delete_identity') {
+            // قائمة منسدلة بجميع الشخصيات (الاسم الكامل فقط)
+            const identityOptions = Object.values(identities).map(id => ({
+                label: id.fullName,
+                value: id.nationalId
+            }));
+            if (identityOptions.length === 0) {
+                await interaction.reply({ content: 'لا توجد أي هويات حالياً.', ephemeral: true });
+                return;
+            }
+            
+            // نظام الصفحات - عرض أول 24 هوية فقط
+            const pageSize = 24;
+            const firstPageOptions = identityOptions.slice(0, pageSize);
+            
+            const selectMenu = new StringSelectMenuBuilder()
+                .setCustomId('select_identity_to_manage_page_0')
+                .setPlaceholder('اختر هوية')
+                .addOptions(firstPageOptions);
+            
+            const row = new ActionRowBuilder().addComponents(selectMenu);
+            
+            // إضافة زر "رؤية المزيد" إذا كان هناك المزيد من الهويات
+            let components = [row];
+            if (identityOptions.length > pageSize) {
+                const moreButton = new ButtonBuilder()
+                    .setCustomId('view_more_identities_1')
+                    .setLabel('رؤية المزيد')
+                    .setStyle(ButtonStyle.Secondary);
+                const buttonRow = new ActionRowBuilder().addComponents(moreButton);
+                components.push(buttonRow);
+            }
+            
+            const embed = new EmbedBuilder()
+                .setTitle('حذف أو تعديل هوية')
+                .setDescription(`اختر هوية من القائمة لإدارتها (الصفحة 1 من ${Math.ceil(identityOptions.length / pageSize)})`)
+                .setColor('#e74c3c')
+                .setImage(getCustomImage(interaction.guildId));
+            await interaction.reply({ embeds: [embed], components: components, ephemeral: true });
+            return;
+        }
+        
+        if (interaction.values[0] === 'set_military_role') {
+            // مودال لتعيين الرتبة العسكرية
+            const modal = new ModalBuilder()
+                .setCustomId('set_military_role_modal')
+                .setTitle('تعيين رتبة عسكرية')
+                .addComponents(
+                    new ActionRowBuilder().addComponents(
+                        new TextInputBuilder()
+                            .setCustomId('military_role')
+                            .setLabel('آيدي الرتبة العسكرية')
+                            .setStyle(TextInputStyle.Short)
+                            .setRequired(true)
+                            .setMinLength(1)
+                            .setMaxLength(50)
+                            .setPlaceholder('مثال: 123456789012345678')
+                    )
+                );
+            await interaction.showModal(modal);
+            return;
+        }
+        
+        if (interaction.values[0] === 'set_police_admin_role') {
+            // مودال لتعيين رتبة مسؤول الشرطة
+            const modal = new ModalBuilder()
+                .setCustomId('set_police_admin_role_modal')
+                .setTitle('تعيين رتبة مسؤول الشرطة')
+                .addComponents(
+                    new ActionRowBuilder().addComponents(
+                        new TextInputBuilder()
+                            .setCustomId('police_admin_role')
+                            .setLabel('آيدي رتبة مسؤول الشرطة')
+                            .setStyle(TextInputStyle.Short)
+                            .setRequired(true)
+                            .setMinLength(1)
+                            .setMaxLength(50)
+                            .setPlaceholder('مثال: 123456789012345678')
+                    )
+                );
+            await interaction.showModal(modal);
+            return;
+        }
+        
+        if (interaction.values[0] === 'reset') {
+            // إعادة القائمة للوضع الأولي
+            const embed = new EmbedBuilder()
+                .setTitle('🔧 لوحة تحكم المطورين')
+                .setDescription('مرحباً بك في لوحة تحكم المطورين. اختر إجراء من القائمة أدناه:')
+                .setColor('#ff6b6b')
+                .setImage(IMAGE_URL);
+            
+            const selectMenu = new StringSelectMenuBuilder()
+                .setCustomId('owner_select')
+                .setPlaceholder('اختر إجراء')
+                .addOptions([
+                    { label: 'إحصائيات البوت', value: 'bot_stats' },
+                    { label: 'إيقاف | تشغيل البوت', value: 'bot_toggle' },
+                    { label: 'تغيير إمبد', value: 'change_embed' },
+                    { label: 'تغيير حقوق', value: 'change_rights' },
+                    { label: 'تفعيل', value: 'activate' },
+                    { label: 'إعادة تعيين', value: 'reset' }
+                ]);
+            
+            const row = new ActionRowBuilder().addComponents(selectMenu);
+            await interaction.update({ embeds: [embed], components: [row], ephemeral: true });
+            return;
+        }
+        
+        if (interaction.values[0] === 'view_settings') {
+            // جلب الإعدادات الحالية
+            const logChannel = config.logChannelId ? `<#${config.logChannelId}>` : 'غير محدد';
+            const crimesLogChannel = config.crimesLogChannelId ? `<#${config.crimesLogChannelId}>` : 'غير محدد';
+            const directMilitaryRoom = config.directMilitaryRoomId ? `<#${config.directMilitaryRoomId}>` : 'غير محدد';
+            const policeLogRoom = config.policeLogChannelId ? `<#${config.policeLogChannelId}>` : 'غير محدد';
+            let militaryRole = 'غير محدد';
+            let policeAdminRole = 'غير محدد';
+            try {
+                if (config.militaryRoleId) {
+                    const role = interaction.guild.roles.cache.get(config.militaryRoleId);
+                    if (role) militaryRole = `<@&${role.id}>`;
+                }
+                if (config.policeAdminRoleId) {
+                    const role = interaction.guild.roles.cache.get(config.policeAdminRoleId);
+                    if (role) policeAdminRole = `<@&${role.id}>`;
+                }
+            } catch {}
+            const embed = new EmbedBuilder()
+                .setTitle('🔎 ملخص التعديلات والإعدادات')
+                .setColor('#f39c12')
+                    .addFields(
+                    { name: 'لوق الهوية', value: logChannel, inline: true },
+                    { name: 'لوق الجرائم', value: crimesLogChannel, inline: true },
+                    { name: 'روم مباشرة العسكر', value: directMilitaryRoom, inline: true },
+                    { name: 'روم لوق الشرطة', value: policeLogRoom, inline: true },
+                    { name: 'الرتبة العسكرية', value: militaryRole, inline: true },
+                    { name: 'رتبة مسؤول الشرطة', value: policeAdminRole, inline: true }
+                )
+                .setTimestamp();
+            await interaction.reply({ embeds: [embed], ephemeral: true });
+            return;
+        }
+        if (interaction.values[0] === 'set_direct_military_room') {
+            // مودال تعيين روم مباشرة العسكر
+            const modal = new ModalBuilder()
+                .setCustomId('set_direct_military_room_modal')
+                .setTitle('تعيين روم مباشرة العسكر')
+                .addComponents(
+                    new ActionRowBuilder().addComponents(
+                        new TextInputBuilder()
+                            .setCustomId('direct_military_room_id')
+                            .setLabel('أدخل آيدي الروم')
+                            .setStyle(TextInputStyle.Short)
+                            .setRequired(true)
+                    )
+                );
+            await interaction.showModal(modal);
+            return;
+        }
+        if (interaction.values[0] === 'set_police_log_room') {
+            // مودال تعيين روم لوق الشرطة
+            const modal = new ModalBuilder()
+                .setCustomId('set_police_log_room_modal')
+                .setTitle('تعيين روم لوق الشرطة')
+                .addComponents(
+                    new ActionRowBuilder().addComponents(
+                        new TextInputBuilder()
+                            .setCustomId('police_log_room_id')
+                            .setLabel('أدخل آيدي الروم')
+                            .setStyle(TextInputStyle.Short)
+                            .setRequired(true)
+                    )
+                );
+            await interaction.showModal(modal);
+            return;
+        }
+    }
+
+    // استقبال مودال تعيين لوق الهوية
+    if (interaction.type === InteractionType.ModalSubmit && interaction.customId === 'customize_log_modal') {
+        const logChannelId = interaction.fields.getTextInputValue('log_channel_id');
+        config.logChannelId = logChannelId;
+        saveConfig(config);
+        await interaction.reply({ content: '✅ تم حفظ قناة اللوق بنجاح!', ephemeral: true });
+        return;
+    }
+
+    // استقبال مودال تعيين لوق الجرائم
+    if (interaction.type === InteractionType.ModalSubmit && interaction.customId === 'set_crimes_log_modal') {
+        const logChannelId = interaction.fields.getTextInputValue('crimes_log_channel_id');
+        config.crimesLogChannelId = logChannelId;
+        saveConfig(config);
+        await interaction.reply({ content: '✅ تم حفظ قناة لوق الجرائم بنجاح!', ephemeral: true });
+        return;
+    }
+
+    // استقبال مودال تعيين رتبة عسكرية
+    if (interaction.type === InteractionType.ModalSubmit && interaction.customId === 'set_military_role_modal') {
+        const roleId = interaction.fields.getTextInputValue('military_role');
+        config.militaryRoleId = roleId;
+        saveConfig(config);
+        await interaction.reply({ content: '✅ تم حفظ رتبة العسكرية بنجاح!', ephemeral: true });
+        return;
+    }
+
+    // استقبال مودال تعيين رتبة مسؤول الشرطة
+    if (interaction.type === InteractionType.ModalSubmit && interaction.customId === 'set_police_admin_role_modal') {
+        const roleId = interaction.fields.getTextInputValue('police_admin_role');
+        config.policeAdminRoleId = roleId;
+        saveConfig(config);
+        await interaction.reply({ content: '✅ تم حفظ رتبة مسؤول الشرطة بنجاح!', ephemeral: true });
+        return;
+    }
+
+    // استقبال مودال البحث عن شخص
+    if (interaction.type === InteractionType.ModalSubmit && interaction.customId === 'search_person_modal') {
+        const searchQuery = interaction.fields.getTextInputValue('search_query');
+        
+        // البحث في الهويات
+        const foundIdentity = Object.values(identities).find(id => 
+            id.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            id.nationalId === searchQuery
+        );
+        
+        if (!foundIdentity) {
+            await interaction.reply({ content: '❌ لم يتم العثور على شخص بهذا الاسم أو الرقم الوطني.', ephemeral: true });
+            return;
+        }
+        
+        // إنشاء embed بمعلومات الشخص
+        const embed = new EmbedBuilder()
+            .setTitle(`🔍 نتائج البحث: ${foundIdentity.fullName}`)
+            .setColor('#3498db')
+            .setImage(getCustomImage(interaction.guildId))
+            .addFields(
+                { name: 'الاسم الكامل', value: foundIdentity.fullName, inline: true },
+                { name: 'الجنس', value: foundIdentity.gender, inline: true },
+                { name: 'تاريخ الميلاد', value: `${foundIdentity.day.padStart(2, '0')}/${convertArabicMonthToNumber(foundIdentity.month)}/${foundIdentity.year}`, inline: true },
+                { name: 'مكان الولادة', value: foundIdentity.city, inline: true },
+                { name: 'الرقم الوطني', value: foundIdentity.nationalId, inline: true },
+                { name: 'صاحب الهوية', value: `<@${foundIdentity.userId}>`, inline: true }
+            )
+            .setTimestamp();
+        
+        await interaction.reply({ embeds: [embed], ephemeral: true });
+        return;
+    }
+
+    // استقبال مودال سجل الجرائم
+    if (interaction.type === InteractionType.ModalSubmit && interaction.customId === 'crime_record_modal') {
+        const searchQuery = interaction.fields.getTextInputValue('search_query');
+        
+        // البحث في الهويات
+        const foundIdentity = Object.values(identities).find(id => 
+            id.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            id.nationalId === searchQuery
+        );
+        
+        if (!foundIdentity) {
+            await interaction.reply({ content: '❌ لم يتم العثور على شخص بهذا الاسم أو الرقم الوطني.', ephemeral: true });
+            return;
+        }
+        
+        const userCrimes = crimes[foundIdentity.nationalId] || [];
+        
+        if (userCrimes.length === 0) {
+            // إنشاء نفس الصورة مع نص أحمر "لا يوجد جرائم لهذا الشخص"
+            const buffer = await createCrimePage(foundIdentity, [], 0, interaction, true); // true = no crimes
+            const attachment = new AttachmentBuilder(buffer, { name: 'crime_record.png' });
+            await interaction.reply({ files: [attachment], ephemeral: true });
+            return;
+        }
+        
+        const crimesPerPage = 8;
+        const pageNumber = 0;
+        const totalPages = Math.ceil(userCrimes.length / crimesPerPage) || 1;
+        const buffer = await createCrimePage(foundIdentity, userCrimes, pageNumber, interaction, false);
+        const attachment = new AttachmentBuilder(buffer, { name: 'crime_record.png' });
+        // أزرار تصفح الصفحات إذا كان هناك أكثر من صفحة
+        let components = [];
+        if (totalPages > 1) {
+            const nextBtn = new ButtonBuilder()
+                .setCustomId(`crime_page_${foundIdentity.nationalId}_${pageNumber + 1}`)
+                .setLabel('التالي')
+                .setStyle(ButtonStyle.Primary)
+                .setDisabled(pageNumber + 1 >= totalPages);
+            const row = new ActionRowBuilder().addComponents(nextBtn);
+            components = [row];
+        }
+        await interaction.reply({ files: [attachment], components, ephemeral: true });
+        return;
+    }
+
+    // التعامل مع أزرار تصفح صفحات سجل الجرائم
+    if (interaction.isButton() && interaction.customId.startsWith('crime_page_')) {
+        // customId: crime_page_{nationalId}_{pageNumber}
         const parts = interaction.customId.split('_');
-        const nationalId = parts[3];
-        const pageNumber = parseInt(parts[4]);
+        const nationalId = parts[2];
+        const pageNumber = parseInt(parts[3]);
+        const foundIdentity = identities[nationalId];
+        const userCrimes = crimes[nationalId] || [];
+        const crimesPerPage = 8;
+        const totalPages = Math.ceil(userCrimes.length / crimesPerPage) || 1;
+        const buffer = await createCrimePage(foundIdentity, userCrimes, pageNumber, interaction, false);
+        const attachment = new AttachmentBuilder(buffer, { name: 'crime_record.png' });
+        // أزرار تصفح الصفحات
+        let components = [];
+        const prevBtn = new ButtonBuilder()
+            .setCustomId(`crime_page_${nationalId}_${pageNumber - 1}`)
+            .setLabel('السابق')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(pageNumber <= 0);
+        const nextBtn = new ButtonBuilder()
+            .setCustomId(`crime_page_${nationalId}_${pageNumber + 1}`)
+            .setLabel('التالي')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(pageNumber + 1 >= totalPages);
+        const row = new ActionRowBuilder().addComponents(prevBtn, nextBtn);
+        components = [row];
+        await interaction.update({ files: [attachment], components, ephemeral: true });
+        return;
+    }
+
+    // استقبال مودال تعيين روم مباشرة العسكر
+    if (interaction.type === InteractionType.ModalSubmit && interaction.customId === 'set_direct_military_room_modal') {
+        console.log('تم استقبال مودال تعيين روم مباشرة العسكر');
+        try {
+            const roomId = interaction.fields.getTextInputValue('direct_military_room_id');
+            console.log('آيدي الروم المدخل:', roomId);
+            config.directMilitaryRoomId = roomId;
+            saveConfig(config);
+            console.log('تم حفظ config:', config);
+            await interaction.reply({ content: '✅ تم حفظ روم مباشرة العسكر بنجاح!', ephemeral: true });
+        } catch (error) {
+            console.error('خطأ في حفظ روم مباشرة العسكر:', error);
+            await interaction.reply({ content: '❌ حدث خطأ في حفظ روم مباشرة العسكر', ephemeral: true });
+        }
+        return;
+    }
+
+    // استقبال مودال تعيين روم لوق الشرطة
+    if (interaction.type === InteractionType.ModalSubmit && interaction.customId === 'set_police_log_room_modal') {
+        console.log('تم استقبال مودال تعيين روم لوق الشرطة');
+        try {
+            const roomId = interaction.fields.getTextInputValue('police_log_room_id');
+            console.log('آيدي الروم المدخل:', roomId);
+            config.policeLogChannelId = roomId;
+            saveConfig(config);
+            console.log('تم حفظ config:', config);
+            await interaction.reply({ content: '✅ تم حفظ روم لوق الشرطة بنجاح!', ephemeral: true });
+        } catch (error) {
+            console.error('خطأ في حفظ روم لوق الشرطة:', error);
+            await interaction.reply({ content: '❌ حدث خطأ في حفظ روم لوق الشرطة', ephemeral: true });
+        }
+        return;
+    }
+
+    // التعامل مع إدارة الجرائم
+    if (interaction.type === InteractionType.ModalSubmit && interaction.customId === 'manage_crimes_modal') {
+        const searchQuery = interaction.fields.getTextInputValue('search_query');
+        
+        // البحث في الهويات
+        const foundIdentity = Object.values(identities).find(id => 
+            id.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            id.nationalId === searchQuery
+        );
+        
+        if (!foundIdentity) {
+            await interaction.reply({ content: '❌ لم يتم العثور على شخص بهذا الاسم أو الرقم الوطني.', ephemeral: true });
+            return;
+        }
+        
+        const userCrimes = crimes[foundIdentity.nationalId] || [];
+        
+        if (userCrimes.length === 0) {
+            // إنشاء embed مع زر إضافة جريمة
+            const embed = new EmbedBuilder()
+                .setTitle(`🔧 إدارة الجرائم - ${foundIdentity.fullName}`)
+                .setDescription('لا توجد جرائم حالياً لهذا الشخص.')
+                .setColor('#e74c3c')
+                .setImage(getCustomImage(interaction.guildId));
+            
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`add_crime_${foundIdentity.nationalId}`)
+                    .setLabel('إضافة جريمة')
+                    .setStyle(ButtonStyle.Success)
+            );
+            
+            await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+            return;
+        }
+        
+        // إنشاء قائمة منسدلة بالجرائم
+        const crimeOptions = userCrimes.map((crime, index) => ({
+            label: `${crime.title} - ${crime.executed ? 'مسددة' : 'غير مسددة'}`,
+            value: index.toString()
+        }));
+        
+        crimeOptions.push({ label: 'إعادة تعيين', value: 'reset' });
+        
+        const selectMenu = new StringSelectMenuBuilder()
+            .setCustomId(`manage_crime_${foundIdentity.nationalId}`)
+            .setPlaceholder('اختر جريمة لإدارتها')
+            .addOptions(crimeOptions);
+        
+        const row = new ActionRowBuilder().addComponents(selectMenu);
+        
+        const embed = new EmbedBuilder()
+            .setTitle(`🔧 إدارة الجرائم - ${foundIdentity.fullName}`)
+            .setDescription('اختر جريمة من القائمة لإدارتها:')
+            .setColor('#e74c3c')
+            .setImage(getCustomImage(interaction.guildId));
+        
+        // إضافة زر إضافة جريمة
+        const addCrimeButton = new ButtonBuilder()
+            .setCustomId(`add_crime_${foundIdentity.nationalId}`)
+            .setLabel('إضافة جريمة')
+            .setStyle(ButtonStyle.Success);
+        
+        const buttonRow = new ActionRowBuilder().addComponents(addCrimeButton);
+        
+        await interaction.reply({ embeds: [embed], components: [row, buttonRow], ephemeral: true });
+        return;
+    }
+
+    // استقبال مودال إصدار مذكرة قبض
+    if (interaction.type === InteractionType.ModalSubmit && interaction.customId === 'arrest_warrant_search_modal') {
+        const searchQuery = interaction.fields.getTextInputValue('arrest_search_query');
+        
+        // البحث في الهويات
+        const foundIdentity = Object.values(identities).find(id => 
+            id.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            id.nationalId === searchQuery
+        );
+        
+        if (!foundIdentity) {
+            await interaction.reply({ content: '❌ لم يتم العثور على شخص بهذا الاسم أو الرقم الوطني.', ephemeral: true });
+            return;
+        }
+        
+        // إنشاء embed بمعلومات الشخص
+        const embed = new EmbedBuilder()
+            .setTitle(`🚨 إصدار مذكرة قبض - ${foundIdentity.fullName}`)
+            .setColor('#e74c3c')
+            .setImage(getCustomImage(interaction.guildId))
+            .addFields(
+                { name: 'الاسم الكامل', value: foundIdentity.fullName, inline: true },
+                { name: 'الجنس', value: foundIdentity.gender, inline: true },
+                { name: 'تاريخ الميلاد', value: `${foundIdentity.day.padStart(2, '0')}/${convertArabicMonthToNumber(foundIdentity.month)}/${foundIdentity.year}`, inline: true },
+                { name: 'مكان الولادة', value: foundIdentity.city, inline: true },
+                { name: 'الرقم الوطني', value: foundIdentity.nationalId, inline: true },
+                { name: 'صاحب الهوية', value: `<@${foundIdentity.userId}>`, inline: true }
+            )
+            .setTimestamp();
+        
+        // زر إصدار المذكرة
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`issue_arrest_warrant_${foundIdentity.nationalId}`)
+                .setLabel('إصدار مذكرة قبض')
+                .setStyle(ButtonStyle.Danger)
+        );
+        
+        // حفظ هوية الشخص المطلوب
+        userData.set(interaction.user.id, { 
+            ...userData.get(interaction.user.id), 
+            arrestTarget: foundIdentity.nationalId 
+        });
+        
+        await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+        return;
+    }
+
+    // التعامل مع زر إصدار مذكرة قبض
+    if (interaction.isButton() && interaction.customId.startsWith('issue_arrest_warrant_')) {
+        const nationalId = interaction.customId.replace('issue_arrest_warrant_', '');
         const identity = identities[nationalId];
         
         if (!identity) {
@@ -2283,6 +3764,799 @@ client.on(Events.InteractionCreate, async interaction => {
             return;
         }
         
+        // إنشاء مودال إصدار مذكرة قبض
+        const modal = new ModalBuilder()
+            .setCustomId('arrest_warrant_details_modal')
+            .setTitle('تفاصيل مذكرة القبض')
+            .addComponents(
+                new ActionRowBuilder().addComponents(
+                    new TextInputBuilder()
+                        .setCustomId('arrest_title')
+                        .setLabel('عنوان المذكرة')
+                        .setStyle(TextInputStyle.Short)
+                        .setPlaceholder('مثال: مذكرة قبض بتهمة السرقة')
+                        .setRequired(true)
+                ),
+                new ActionRowBuilder().addComponents(
+                    new TextInputBuilder()
+                        .setCustomId('arrest_desc')
+                        .setLabel('وصف المذكرة')
+                        .setStyle(TextInputStyle.Paragraph)
+                        .setPlaceholder('أدخل تفاصيل كاملة عن سبب إصدار المذكرة...')
+                        .setRequired(true)
+                ),
+                new ActionRowBuilder().addComponents(
+                    new TextInputBuilder()
+                        .setCustomId('arrest_severity')
+                        .setLabel('درجة الخطورة')
+                        .setStyle(TextInputStyle.Short)
+                        .setPlaceholder('مثال: عالية / متوسطة / منخفضة')
+                        .setRequired(true)
+                )
+            );
+        
+        // حفظ هوية الشخص المطلوب
+        userData.set(interaction.user.id, { 
+            ...userData.get(interaction.user.id), 
+            arrestTarget: nationalId 
+        });
+        
+        await interaction.showModal(modal);
+        return;
+    }
+
+    // استقبال مودال إضافة مخالفة
+    if (interaction.type === InteractionType.ModalSubmit && interaction.customId === 'add_violation_search_modal') {
+        const searchQuery = interaction.fields.getTextInputValue('violation_search_query');
+        
+        // البحث في الهويات
+        const foundIdentity = Object.values(identities).find(id => 
+            id.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            id.nationalId === searchQuery
+        );
+        
+        if (!foundIdentity) {
+            await interaction.reply({ content: '❌ لم يتم العثور على شخص بهذا الاسم أو الرقم الوطني.', ephemeral: true });
+            return;
+        }
+        
+        // إنشاء embed بمعلومات الشخص
+        const embed = new EmbedBuilder()
+            .setTitle(`🚨 إدارة المخالفات - ${foundIdentity.fullName}`)
+            .setColor('#f39c12')
+            .setImage(getCustomImage(interaction.guildId))
+            .addFields(
+                { name: 'الاسم الكامل', value: foundIdentity.fullName, inline: true },
+                { name: 'الجنس', value: foundIdentity.gender, inline: true },
+                { name: 'تاريخ الميلاد', value: `${foundIdentity.day.padStart(2, '0')}/${convertArabicMonthToNumber(foundIdentity.month)}/${foundIdentity.year}`, inline: true },
+                { name: 'مكان الولادة', value: foundIdentity.city, inline: true },
+                { name: 'الرقم الوطني', value: foundIdentity.nationalId, inline: true },
+                { name: 'صاحب الهوية', value: `<@${foundIdentity.userId}>`, inline: true }
+            )
+            .setTimestamp();
+        
+        // جلب المخالفات الحالية
+        const userViolations = violations[foundIdentity.nationalId] || [];
+        
+        // إنشاء قائمة منسدلة بالمخالفات (أول 24 فقط)
+        const pageSize = 24;
+        const firstPageViolations = userViolations.slice(0, pageSize);
+        
+        const violationOptions = firstPageViolations.map((violation, index) => ({
+            label: `${violation.title} - ${violation.executed ? 'مسددة' : 'غير مسددة'}`,
+            value: index.toString(),
+            description: `$${violation.fine}`
+        }));
+        
+        violationOptions.push({ label: 'إعادة تعيين', value: 'reset' });
+        
+        const selectMenu = new StringSelectMenuBuilder()
+            .setCustomId(`manage_violation_${foundIdentity.nationalId}`)
+            .setPlaceholder('اختر مخالفة لإدارتها')
+            .addOptions(violationOptions);
+        
+        const row = new ActionRowBuilder().addComponents(selectMenu);
+        
+        // أزرار الإدارة
+        const buttonRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`add_violation_btn_${foundIdentity.nationalId}`)
+                .setLabel('إضافة مخالفة')
+                .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+                .setCustomId(`delete_violation_btn_${foundIdentity.nationalId}`)
+                .setLabel('حذف مخالفة')
+                .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+                .setCustomId(`edit_violation_btn_${foundIdentity.nationalId}`)
+                .setLabel('تعديل مخالفة')
+                .setStyle(ButtonStyle.Primary)
+        );
+        
+        // إضافة زر "رؤية المزيد" إذا كان هناك أكثر من 24 مخالفة
+        let components = [row, buttonRow];
+        if (userViolations.length > pageSize) {
+            const moreButton = new ButtonBuilder()
+                .setCustomId(`view_more_violations_${foundIdentity.nationalId}_1`)
+                .setLabel('رؤية المزيد')
+                .setStyle(ButtonStyle.Secondary);
+            const moreRow = new ActionRowBuilder().addComponents(moreButton);
+            components.push(moreRow);
+        }
+        
+        // حفظ هوية الشخص المطلوب
+        userData.set(interaction.user.id, { 
+            ...userData.get(interaction.user.id), 
+            violationTarget: foundIdentity.nationalId 
+        });
+        
+                await interaction.reply({ embeds: [embed], components: components, ephemeral: true });
+        return;
+    }
+
+    // التعامل مع زر إضافة مخالفة
+    if (interaction.isButton() && interaction.customId.startsWith('add_violation_btn_')) {
+        // التحقق من الصلاحيات: فقط مسؤولي الشرطة يمكنهم إضافة المخالفات
+        if (!hasPoliceAdminRole(interaction.member)) {
+            await interaction.reply({
+                content: '❌ فقط مسؤولي الشرطة يمكنهم إضافة المخالفات.',
+                ephemeral: true
+            });
+            return;
+        }
+        
+        const nationalId = interaction.customId.replace('add_violation_btn_', '');
+        const identity = identities[nationalId];
+        
+        if (!identity) {
+            await interaction.reply({ content: '❌ لم يتم العثور على الهوية المحددة.', ephemeral: true });
+            return;
+        }
+        
+        // قائمة بعناوين المخالفات (24 عنوان)
+        const violationTitles = [
+            'القيادة بسرعة زائدة',
+            'الوقوف في مكان ممنوع',
+            'عدم ارتداء حزام الأمان',
+            'استخدام الهاتف أثناء القيادة',
+            'عدم إعطاء الأولوية للمشاة',
+            'القيادة تحت تأثير الكحول',
+            'عدم تجديد رخصة القيادة',
+            'القيادة بدون تأمين',
+            'تجاوز الإشارة الحمراء',
+            'القيادة في الاتجاه المعاكس',
+            'عدم حمل وثائق المركبة',
+            'القيادة بمركبة معطلة',
+            'عدم إصلاح عيوب المركبة',
+            'القيادة بدون لوحات',
+            'عدم حمل رخصة القيادة',
+            'القيادة بسرعة بطيئة',
+            'عدم إعطاء إشارات المرور',
+            'الوقوف في مكان إسعاف',
+            'عدم حمل شهادة الفحص',
+            'القيادة في الطريق السريع',
+            'عدم حمل شهادة التأمين',
+            'القيادة بمركبة ملوثة',
+            'عدم حمل شهادة الجمرك',
+            'إعادة تعيين'
+        ];
+        
+        // إنشاء قائمة منسدلة بعناوين المخالفات
+        const violationOptions = violationTitles.map(title => ({
+            label: title,
+            value: title === 'إعادة تعيين' ? 'reset' : title
+        }));
+        
+        const selectMenu = new StringSelectMenuBuilder()
+            .setCustomId(`select_violation_title_${nationalId}`)
+            .setPlaceholder('اختر عنوان المخالفة')
+            .addOptions(violationOptions);
+        
+        const row = new ActionRowBuilder().addComponents(selectMenu);
+        
+        const embed = new EmbedBuilder()
+            .setTitle(`🚨 إضافة مخالفة - ${identity.fullName}`)
+            .setDescription('اختر عنوان المخالفة من القائمة المنسدلة:')
+            .setColor('#f39c12')
+            .setImage(getCustomImage(interaction.guildId));
+        
+        await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+        return;
+    }
+
+    // التعامل مع اختيار عنوان المخالفة
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('select_violation_title_')) {
+        if (interaction.values[0] === 'reset') {
+            // إعادة القائمة للوضع الأولي
+            const embed = new EmbedBuilder()
+                .setTitle('🚔 قسم الشرطة')
+                .setDescription('مرحباً بك في قسم الشرطة. اختر إجراء من القائمة أدناه:')
+                .setColor('#ff0000')
+                .setImage(getCustomImage(interaction.guildId));
+            
+            const selectMenu = new StringSelectMenuBuilder()
+                .setCustomId('police_select')
+                .setPlaceholder('اختر إجراء')
+                .addOptions([
+                    { label: 'البحث عن شخص', value: 'search_person' },
+                    { label: 'سجل الجرائم', value: 'crime_record' },
+                    { label: 'إدارة الجرائم', value: 'manage_crimes' },
+                    { label: 'إصدار مذكرة قبض', value: 'arrest_warrant' },
+                    { label: 'إضافة مخالفة', value: 'add_violation' },
+                    { label: 'إعادة تعيين', value: 'reset' }
+                ]);
+            
+            const row = new ActionRowBuilder().addComponents(selectMenu);
+            await interaction.update({ embeds: [embed], components: [row], ephemeral: true });
+            return;
+        }
+        
+        const nationalId = interaction.customId.replace('select_violation_title_', '');
+        const violationTitle = interaction.values[0];
+        const identity = identities[nationalId];
+        
+        if (!identity) {
+            await interaction.reply({ content: '❌ لم يتم العثور على الهوية المحددة.', ephemeral: true });
+            return;
+        }
+        
+        // إنشاء مودال لإدخال تفاصيل المخالفة
+        const modal = new ModalBuilder()
+            .setCustomId(`add_violation_details_${nationalId}`)
+            .setTitle(`إضافة مخالفة - ${violationTitle}`)
+            .addComponents(
+                new ActionRowBuilder().addComponents(
+                    new TextInputBuilder()
+                        .setCustomId('violation_title')
+                        .setLabel('عنوان المخالفة')
+                        .setStyle(TextInputStyle.Short)
+                        .setValue(violationTitle)
+                        .setRequired(true)
+                ),
+                new ActionRowBuilder().addComponents(
+                    new TextInputBuilder()
+                        .setCustomId('violation_desc')
+                        .setLabel('وصف المخالفة')
+                        .setStyle(TextInputStyle.Paragraph)
+                        .setPlaceholder('أدخل تفاصيل المخالفة...')
+                        .setRequired(true)
+                ),
+                new ActionRowBuilder().addComponents(
+                    new TextInputBuilder()
+                        .setCustomId('violation_fine')
+                        .setLabel('قيمة المخالفة ($)')
+                        .setStyle(TextInputStyle.Short)
+                        .setPlaceholder('مثال: 500')
+                        .setRequired(true)
+                )
+            );
+        
+        await interaction.showModal(modal);
+        return;
+    }
+
+    // استقبال مودال تفاصيل مذكرة القبض
+    if (interaction.type === InteractionType.ModalSubmit && interaction.customId === 'arrest_warrant_details_modal') {
+                const userId = interaction.user.id;
+        const userDataEntry = userData.get(userId);
+        
+        if (!userDataEntry || !userDataEntry.arrestTarget) {
+            await interaction.reply({ content: '❌ خطأ في عملية إصدار مذكرة قبض.', ephemeral: true });
+            return;
+        }
+        
+        const title = interaction.fields.getTextInputValue('arrest_title');
+        const desc = interaction.fields.getTextInputValue('arrest_desc');
+        const severity = interaction.fields.getTextInputValue('arrest_severity');
+        
+        const targetIdentity = identities[userDataEntry.arrestTarget];
+        if (!targetIdentity) {
+            await interaction.reply({ content: '❌ لم يتم العثور على الهوية المستهدفة.', ephemeral: true });
+            return;
+        }
+        
+        // إنشاء embed مراجعة المذكرة
+        const embed = new EmbedBuilder()
+            .setTitle(`🚨 مراجعة مذكرة القبض - ${targetIdentity.fullName}`)
+            .setColor('#e74c3c')
+            .setImage(getCustomImage(interaction.guildId))
+            .addFields(
+                { name: 'عنوان المذكرة', value: title, inline: true },
+                { name: 'درجة الخطورة', value: severity, inline: true },
+                { name: 'تاريخ الإصدار', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true },
+                { name: 'وصف المذكرة', value: desc, inline: false }
+            )
+            .setTimestamp();
+        
+        // زر تأكيد الرفع
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`confirm_arrest_warrant_${targetIdentity.nationalId}`)
+                .setLabel('تأكيد الرفع')
+                .setStyle(ButtonStyle.Success)
+        );
+        
+        // حفظ تفاصيل المذكرة
+        userData.set(interaction.user.id, { 
+            ...userData.get(interaction.user.id), 
+            arrestWarrantDetails: { title, desc, severity }
+        });
+        
+        await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+        return;
+    }
+
+    // التعامل مع زر تأكيد رفع مذكرة القبض
+    if (interaction.isButton() && interaction.customId.startsWith('confirm_arrest_warrant_')) {
+        const userId = interaction.user.id;
+        const userDataEntry = userData.get(userId);
+        
+        if (!userDataEntry || !userDataEntry.arrestTarget || !userDataEntry.arrestWarrantDetails) {
+            await interaction.reply({ content: '❌ خطأ في عملية إصدار مذكرة قبض.', ephemeral: true });
+            return;
+        }
+        
+        const nationalId = interaction.customId.replace('confirm_arrest_warrant_', '');
+        const targetIdentity = identities[nationalId];
+        
+        if (!targetIdentity) {
+            await interaction.reply({ content: '❌ لم يتم العثور على الهوية المستهدفة.', ephemeral: true });
+            return;
+        }
+        
+        const { title, desc, severity } = userDataEntry.arrestWarrantDetails;
+        
+        // إضافة مذكرة القبض إلى سجل الجرائم
+        if (!crimes[targetIdentity.nationalId]) {
+            crimes[targetIdentity.nationalId] = [];
+        }
+        
+        const crime = {
+            title: title,
+            desc: `وصف: ${desc}\nدرجة الخطورة: ${severity}`,
+            months: 0, // مذكرة قبض لا تحتوي على مدة
+            fine: 0,
+            executed: false,
+            date: new Date().toISOString(),
+            type: 'arrest_warrant' // تمييز نوع الجريمة
+        };
+        
+        crimes[targetIdentity.nationalId].push(crime);
+        saveCrimes(crimes);
+        
+        // إرسال لوق
+        sendCrimeLog(interaction, 'add', targetIdentity.fullName, crime.title, crime.desc, crime.months, crime.fine, null, 'crime');
+        
+        // إزالة البيانات المؤقتة
+        userData.delete(userId);
+        
+        await interaction.reply({ 
+            content: `✅ تم إصدار مذكرة قبض ضد **${targetIdentity.fullName}** بنجاح!\n**العنوان:** ${title}\n**الوصف:** ${desc}\n**درجة الخطورة:** ${severity}`, 
+            ephemeral: true 
+        });
+        return;
+    }
+
+    // استقبال مودال تفاصيل المخالفة
+    if (interaction.type === InteractionType.ModalSubmit && interaction.customId.startsWith('add_violation_details_')) {
+        const nationalId = interaction.customId.replace('add_violation_details_', '');
+        const title = interaction.fields.getTextInputValue('violation_title');
+        const desc = interaction.fields.getTextInputValue('violation_desc');
+        const fine = parseInt(interaction.fields.getTextInputValue('violation_fine')) || 0;
+        
+        const targetIdentity = identities[nationalId];
+        if (!targetIdentity) {
+            await interaction.reply({ content: '❌ لم يتم العثور على الهوية المستهدفة.', ephemeral: true });
+            return;
+        }
+        
+        // إضافة المخالفة
+        if (!violations[targetIdentity.nationalId]) {
+            violations[targetIdentity.nationalId] = [];
+        }
+        
+        const violation = {
+            title,
+            desc,
+            fine,
+            executed: false,
+            date: new Date().toISOString()
+        };
+        
+        violations[targetIdentity.nationalId].push(violation);
+        saveViolations(violations);
+        
+        // إرسال لوق
+        sendCrimeLog(interaction, 'add', targetIdentity.fullName, violation.title, violation.desc, 0, violation.fine, null, 'violation');
+        
+        await interaction.reply({ 
+            content: `✅ تم إضافة مخالفة إلى **${targetIdentity.fullName}** بنجاح!\n**العنوان:** ${title}\n**الوصف:** ${desc}\n**القيمة:** $${fine}`, 
+            ephemeral: true 
+        });
+        return;
+    }
+
+    // استقبال مودال إضافة مخالفة (الطريقة القديمة - للتوافق)
+    if (interaction.type === InteractionType.ModalSubmit && interaction.customId === 'add_violation_modal') {
+        const userId = interaction.user.id;
+        const userDataEntry = userData.get(userId);
+        
+        if (!userDataEntry || !userDataEntry.violationTarget) {
+            await interaction.reply({ content: '❌ خطأ في عملية إضافة مخالفة.', ephemeral: true });
+            return;
+        }
+        
+        const title = interaction.fields.getTextInputValue('violation_title');
+        const desc = interaction.fields.getTextInputValue('violation_desc');
+        const fine = parseInt(interaction.fields.getTextInputValue('violation_fine')) || 0;
+        
+        const targetIdentity = identities[userDataEntry.violationTarget];
+        if (!targetIdentity) {
+            await interaction.reply({ content: '❌ لم يتم العثور على الهوية المستهدفة.', ephemeral: true });
+            return;
+        }
+        
+        // إضافة المخالفة
+        if (!violations[targetIdentity.nationalId]) {
+            violations[targetIdentity.nationalId] = [];
+        }
+        
+        const violation = {
+            title,
+            desc,
+            fine,
+            executed: false,
+            date: new Date().toISOString()
+        };
+        
+        violations[targetIdentity.nationalId].push(violation);
+        saveViolations(violations);
+        
+        // إرسال لوق
+        sendCrimeLog(interaction, 'add', targetIdentity.fullName, violation.title, violation.desc, 0, violation.fine, null, 'violation');
+        
+        // إزالة البيانات المؤقتة
+        userData.delete(userId);
+        
+        await interaction.reply({ 
+            content: `✅ تم إضافة مخالفة إلى **${targetIdentity.fullName}** بنجاح!\n**العنوان:** ${title}\n**الوصف:** ${desc}\n**القيمة:** $${fine}`, 
+            ephemeral: true 
+        });
+        return;
+    }
+
+    // التعامل مع اختيار الهوية لإدارتها
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('select_identity_to_manage_page_')) {
+        const selectedNationalId = interaction.values[0];
+        const selectedIdentity = identities[selectedNationalId];
+        
+        if (!selectedIdentity) {
+            await interaction.reply({ content: '❌ لم يتم العثور على الهوية المحددة.', ephemeral: true });
+            return;
+        }
+        
+        // إنشاء embed بمعلومات الهوية
+        const embed = new EmbedBuilder()
+            .setTitle(`🆔 معلومات الهوية: ${selectedIdentity.fullName}`)
+            .setColor('#3498db')
+            .setImage(getCustomImage(interaction.guildId))
+            .addFields(
+                { name: 'الاسم الكامل', value: selectedIdentity.fullName, inline: true },
+                { name: 'الجنس', value: selectedIdentity.gender, inline: true },
+                { name: 'تاريخ الميلاد', value: `${selectedIdentity.day.padStart(2, '0')}/${convertArabicMonthToNumber(selectedIdentity.month)}/${selectedIdentity.year}`, inline: true },
+                { name: 'مكان الولادة', value: selectedIdentity.city, inline: true },
+                { name: 'الرقم الوطني', value: selectedIdentity.nationalId, inline: true },
+                { name: 'صاحب الهوية', value: `<@${selectedIdentity.userId}>`, inline: true }
+            )
+            .setTimestamp();
+        
+        // أزرار الإدارة
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`delete_identity_${selectedNationalId}`)
+                .setLabel('حذف الهوية')
+                .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+                .setCustomId(`edit_identity_${selectedNationalId}`)
+                .setLabel('تعديل الهوية')
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId('back_to_identities')
+                .setLabel('العودة')
+                .setStyle(ButtonStyle.Secondary)
+        );
+        
+        await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+        return;
+    }
+
+    // التعامل مع إدارة المخالفات
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('manage_violation_')) {
+        if (interaction.values[0] === 'reset') {
+            // إعادة القائمة للوضع الأولي
+            const embed = new EmbedBuilder()
+                .setTitle('🚔 قسم الشرطة')
+                .setDescription('مرحباً بك في قسم الشرطة. اختر إجراء من القائمة أدناه:')
+                .setColor('#ff0000')
+                .setImage(getCustomImage(interaction.guildId));
+            
+            const selectMenu = new StringSelectMenuBuilder()
+                .setCustomId('police_select')
+                .setPlaceholder('اختر إجراء')
+                .addOptions([
+                    { label: 'البحث عن شخص', value: 'search_person' },
+                    { label: 'سجل الجرائم', value: 'crime_record' },
+                    { label: 'إدارة الجرائم', value: 'manage_crimes' },
+                    { label: 'إصدار مذكرة قبض', value: 'arrest_warrant' },
+                    { label: 'إضافة مخالفة', value: 'add_violation' },
+                    { label: 'إعادة تعيين', value: 'reset' }
+                ]);
+            
+            const row = new ActionRowBuilder().addComponents(selectMenu);
+            await interaction.update({ embeds: [embed], components: [row], ephemeral: true });
+            return;
+        }
+        
+        const nationalId = interaction.customId.split('_')[2];
+        const violationIndex = parseInt(interaction.values[0]);
+        const userViolations = violations[nationalId] || [];
+        const selectedViolation = userViolations[violationIndex];
+        
+        if (!selectedViolation) {
+            await interaction.reply({ content: '❌ لم يتم العثور على المخالفة المحددة أو تم حذفها.', ephemeral: true });
+            return;
+        }
+        
+        const identity = identities[nationalId];
+        
+        // إنشاء embed بمعلومات المخالفة
+        const embed = new EmbedBuilder()
+            .setTitle(`🚨 إدارة المخالفة - ${identity.fullName}`)
+            .setColor('#f39c12')
+            .setImage(getCustomImage(interaction.guildId))
+            .addFields(
+                { name: 'عنوان المخالفة', value: selectedViolation.title, inline: true },
+                { name: 'وصف المخالفة', value: selectedViolation.desc, inline: true },
+                { name: 'الغرامة', value: `$${selectedViolation.fine}`, inline: true },
+                { name: 'الحالة', value: selectedViolation.executed ? '✅ مسددة' : '❌ غير مسددة', inline: true },
+                { name: 'التاريخ', value: `<t:${Math.floor(new Date(selectedViolation.date).getTime() / 1000)}:F>`, inline: true }
+            )
+            .setTimestamp();
+        
+        // أزرار الإدارة
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`delete_violation_${nationalId}_${violationIndex}`)
+                .setLabel('حذف المخالفة')
+                .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+                .setCustomId(`toggle_violation_status_${nationalId}_${violationIndex}`)
+                .setLabel('تعديل المخالفة')
+                .setStyle(ButtonStyle.Primary)
+        );
+        
+        await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+        return;
+    }
+
+    // التعامل مع إدارة الجرائم
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('manage_crime_')) {
+        if (interaction.values[0] === 'reset') {
+            // إعادة القائمة للوضع الأولي
+            const embed = new EmbedBuilder()
+                .setTitle('🚔 قسم الشرطة')
+                .setDescription('مرحباً بك في قسم الشرطة. اختر إجراء من القائمة أدناه:')
+                .setColor('#ff0000')
+                .setImage(getCustomImage(interaction.guildId));
+            
+            const selectMenu = new StringSelectMenuBuilder()
+                .setCustomId('police_select')
+                .setPlaceholder('اختر إجراء')
+                .addOptions([
+                    { label: 'البحث عن شخص', value: 'search_person' },
+                    { label: 'سجل الجرائم', value: 'crime_record' },
+                    { label: 'إدارة الجرائم', value: 'manage_crimes' },
+                    { label: 'إصدار مذكرة قبض', value: 'arrest_warrant' },
+                    { label: 'إضافة مخالفة', value: 'add_violation' },
+                    { label: 'إعادة تعيين', value: 'reset' }
+                ]);
+            
+            const row = new ActionRowBuilder().addComponents(selectMenu);
+            await interaction.update({ embeds: [embed], components: [row], ephemeral: true });
+            return;
+        }
+        
+        const nationalId = interaction.customId.split('_')[2];
+        const crimeIndex = parseInt(interaction.values[0]);
+        const userCrimes = crimes[nationalId] || [];
+        const selectedCrime = userCrimes[crimeIndex];
+        
+        if (!selectedCrime) {
+            await interaction.reply({ content: '❌ لم يتم العثور على الجريمة المحددة أو تم حذفها.', ephemeral: true });
+            return;
+        }
+        
+        const identity = identities[nationalId];
+        
+        // إنشاء embed بمعلومات الجريمة
+        const embed = new EmbedBuilder()
+            .setTitle(`🔧 إدارة الجريمة - ${identity.fullName}`)
+            .setColor('#e74c3c')
+            .setImage(getCustomImage(interaction.guildId))
+            .addFields(
+                { name: 'عنوان الجريمة', value: selectedCrime.title, inline: true },
+                { name: 'وصف الجريمة', value: selectedCrime.desc, inline: true },
+                { name: 'المدة بالأشهر', value: selectedCrime.months.toString(), inline: true },
+                { name: 'الغرامة', value: `$${selectedCrime.fine}`, inline: true },
+                { name: 'الحالة', value: selectedCrime.executed ? '✅ منفذة' : '❌ غير منفذة', inline: true },
+                { name: 'التاريخ', value: `<t:${Math.floor(new Date(selectedCrime.date).getTime() / 1000)}:F>`, inline: true }
+            )
+            .setTimestamp();
+        
+        // أزرار الإدارة
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`delete_crime_${nationalId}_${crimeIndex}`)
+                .setLabel('حذف الجريمة')
+                .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+                .setCustomId(`toggle_crime_status_${nationalId}_${crimeIndex}`)
+                .setLabel('تعديل الجريمة')
+                .setStyle(ButtonStyle.Primary)
+        );
+        
+        // إضافة زر إضافة جريمة
+        const addCrimeButton = new ButtonBuilder()
+            .setCustomId(`add_crime_${nationalId}`)
+            .setLabel('إضافة جريمة')
+            .setStyle(ButtonStyle.Success);
+        
+        const buttonRow = new ActionRowBuilder().addComponents(addCrimeButton);
+        
+        await interaction.reply({ embeds: [embed], components: [row, buttonRow], ephemeral: true });
+        return;
+    }
+
+    // التعامل مع زر حذف المخالفة
+    if (interaction.isButton() && interaction.customId.startsWith('delete_violation_')) {
+        const parts = interaction.customId.split('_');
+        const nationalId = parts[2];
+        const violationIndex = parseInt(parts[3]);
+        const userViolations = violations[nationalId] || [];
+        const selectedViolation = userViolations[violationIndex];
+        
+        if (!selectedViolation) {
+            await interaction.reply({ content: '❌ لم يتم العثور على المخالفة المحددة أو تم حذفها.', ephemeral: true });
+            return;
+        }
+        
+        // حذف المخالفة
+        userViolations.splice(violationIndex, 1);
+        saveViolations(violations);
+        
+        // إرسال لوق
+        sendCrimeLog(interaction, 'delete', identities[nationalId].fullName, selectedViolation.title, selectedViolation.desc, 0, selectedViolation.fine, null, 'violation');
+        
+        await interaction.reply({ 
+            content: `✅ تم حذف المخالفة **${selectedViolation.title}** من **${identities[nationalId].fullName}** بنجاح!`, 
+            ephemeral: true 
+        });
+        return;
+    }
+
+    // التعامل مع زر تعديل حالة المخالفة
+    if (interaction.isButton() && interaction.customId.startsWith('toggle_violation_status_')) {
+        const parts = interaction.customId.split('_');
+        const nationalId = parts[3];
+        const violationIndex = parseInt(parts[4]);
+        const userViolations = violations[nationalId] || [];
+        const selectedViolation = userViolations[violationIndex];
+        
+        if (!selectedViolation) {
+            await interaction.reply({ content: '❌ لم يتم العثور على المخالفة المحددة أو تم حذفها.', ephemeral: true });
+            return;
+        }
+        
+        // تغيير الحالة
+        selectedViolation.executed = !selectedViolation.executed;
+        saveViolations(violations);
+        
+        // إرسال لوق
+        sendCrimeLog(interaction, 'edit', identities[nationalId].fullName, selectedViolation.title, selectedViolation.desc, 0, selectedViolation.fine, selectedViolation.executed ? 'مسددة' : 'غير مسددة', 'violation');
+        
+        await interaction.reply({ 
+            content: `✅ تم تغيير حالة المخالفة **${selectedViolation.title}** إلى: ${selectedViolation.executed ? '✅ مسددة' : '❌ غير مسددة'}`, 
+            ephemeral: true 
+        });
+        return;
+    }
+
+    // التعامل مع زر تعديل حالة الجريمة
+    if (interaction.isButton() && interaction.customId.startsWith('toggle_crime_status_')) {
+        const parts = interaction.customId.split('_');
+        const nationalId = parts[3];
+        const crimeIndex = parseInt(parts[4]);
+        const userCrimes = crimes[nationalId] || [];
+        const selectedCrime = userCrimes[crimeIndex];
+        if (!selectedCrime) {
+            await interaction.reply({ content: '❌ لم يتم العثور على الجريمة المحددة أو تم حذفها.', ephemeral: true });
+            return;
+        }
+        // تغيير الحالة
+        selectedCrime.executed = !selectedCrime.executed;
+        saveCrimes(crimes);
+        
+        // إرسال لوق إلى قناة لوق الجرائم إذا كانت معرفة
+        if (config.crimesLogChannelId) {
+            const logChannel = interaction.guild.channels.cache.get(config.crimesLogChannelId);
+            if (logChannel) {
+                const logEmbed = new EmbedBuilder()
+                    .setTitle('تغيير حالة الجريمة')
+                    .setDescription(`تم تغيير حالة الجريمة للشخص **${identities[nationalId].fullName}** إلى: ${selectedCrime.executed ? '✅ منفذة' : '❌ غير منفذة'}`)
+                    .addFields(
+                        { name: 'عنوان الجريمة', value: selectedCrime.title, inline: true },
+                        { name: 'الوصف', value: selectedCrime.desc, inline: true },
+                        { name: 'الغرامة', value: `$${selectedCrime.fine}`, inline: true },
+                        { name: 'الحالة الجديدة', value: selectedCrime.executed ? '✅ منفذة' : '❌ غير منفذة', inline: true },
+                        { name: 'تاريخ التغيير', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: true }
+                    )
+                    .setColor(selectedCrime.executed ? '#27ae60' : '#e74c3c')
+                    .setTimestamp();
+                logChannel.send({ embeds: [logEmbed] });
+            }
+        }
+        // إنشاء embed محدث مع معلومات الجريمة
+        const identity = identities[nationalId];
+        const embed = new EmbedBuilder()
+            .setTitle(`🔧 إدارة الجريمة - ${identity.fullName}`)
+            .setColor('#e74c3c')
+            .setImage(getCustomImage(interaction.guildId))
+            .addFields(
+                { name: 'عنوان الجريمة', value: selectedCrime.title, inline: true },
+                { name: 'وصف الجريمة', value: selectedCrime.desc, inline: true },
+                { name: 'المدة بالأشهر', value: selectedCrime.months.toString(), inline: true },
+                { name: 'الغرامة', value: `$${selectedCrime.fine}`, inline: true },
+                { name: 'الحالة', value: selectedCrime.executed ? '✅ منفذة' : '❌ غير منفذة', inline: true },
+                { name: 'التاريخ', value: `<t:${Math.floor(new Date(selectedCrime.date).getTime() / 1000)}:F>`, inline: true }
+            )
+            .setTimestamp();
+        
+        // أزرار الإدارة
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`delete_crime_${nationalId}_${crimeIndex}`)
+                .setLabel('حذف الجريمة')
+                .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+                .setCustomId(`toggle_crime_status_${nationalId}_${crimeIndex}`)
+                .setLabel('تعديل الجريمة')
+                .setStyle(ButtonStyle.Primary)
+        );
+        
+        // إضافة زر إضافة جريمة
+        const addCrimeButton = new ButtonBuilder()
+            .setCustomId(`add_crime_${nationalId}`)
+            .setLabel('إضافة جريمة')
+            .setStyle(ButtonStyle.Success);
+        
+        const buttonRow = new ActionRowBuilder().addComponents(addCrimeButton);
+        
+        await interaction.update({ embeds: [embed], components: [row, buttonRow], ephemeral: true });
+        return;
+    }
+
+    // التعامل مع زر رؤية المزيد من المخالفات
+    if (interaction.isButton() && interaction.customId.startsWith('view_more_violations_')) {
+        const parts = interaction.customId.split('_');
+        const nationalId = parts[3];
+        const pageNumber = parseInt(parts[4]);
+        const identity = identities[nationalId];
+        
+                if (!identity) {
+            await interaction.reply({ content: '❌ لم يتم العثور على الهوية المحددة.', ephemeral: true });
+                    return;
+                }
+                
         const userViolations = violations[nationalId] || [];
         const pageSize = 24;
         const startIndex = pageNumber * pageSize;
@@ -2295,15 +4569,15 @@ client.on(Events.InteractionCreate, async interaction => {
         }
         
         // إنشاء embed
-        const embed = new EmbedBuilder()
+                const embed = new EmbedBuilder()
             .setTitle(`🚨 إدارة المخالفات - ${identity.fullName} (الصفحة ${pageNumber + 1})`)
             .setColor('#f39c12')
             .setImage(getCustomImage(interaction.guildId))
-            .addFields(
-                { name: 'الاسم الكامل', value: identity.fullName, inline: true },
-                { name: 'الجنس', value: identity.gender, inline: true },
+                    .addFields(
+                        { name: 'الاسم الكامل', value: identity.fullName, inline: true },
+                        { name: 'الجنس', value: identity.gender, inline: true },
                 { name: 'تاريخ الميلاد', value: `${identity.day.padStart(2, '0')}/${convertArabicMonthToNumber(identity.month)}/${identity.year}`, inline: true },
-                { name: 'مكان الولادة', value: identity.city, inline: true },
+                        { name: 'مكان الولادة', value: identity.city, inline: true },
                 { name: 'الرقم الوطني', value: identity.nationalId, inline: true },
                 { name: 'صاحب الهوية', value: `<@${identity.userId}>`, inline: true }
             )
@@ -2515,7 +4789,7 @@ return;
                 .addFields(
                     { name: 'الرقم الوطني', value: identity.nationalId, inline: false }
                 );
-            await interaction.reply({ embeds: [embed], ephemeral: true });
+                await interaction.reply({ embeds: [embed], ephemeral: true });
             return;
         }
         
@@ -2549,19 +4823,19 @@ return;
     // أمر /شرطة
     if (interaction.type === InteractionType.ApplicationCommand && interaction.commandName === 'شرطة') {
         // المطورين يمكنهم استخدام جميع الأوامر حتى لو كان البوت متوقف
-        if (!OWNER_IDS.includes(interaction.user.id)) {
+                if (!OWNER_IDS.includes(interaction.user.id)) {
             // التحقق من حالة البوت
             if (isBotOffline(interaction.guildId)) {
                 await interaction.reply({ 
                     content: '❌ البوت حالياً متوقف من قبل المطورين يرجى التواصل مع أحد المطورين <@1337512375355707412> <@1070609053065154631> <@1291805249815711826>', 
                     ephemeral: true 
                 });
-                return;
+                    return;
             }
-        }
-        
+                }
+                
         // Embed بصورة الهوية
-        const embed = new EmbedBuilder()
+                const embed = new EmbedBuilder()
             .setTitle('🚔 قسم الشرطة')
             .setDescription('مرحباً بك في قسم الشرطة. اختر إجراء من القائمة أدناه:')
             .setColor('#ff0000')
@@ -2624,7 +4898,7 @@ return;
             const modal = new ModalBuilder()
                 .setCustomId('search_person_modal')
                 .setTitle('البحث عن شخص')
-                .addComponents(
+                    .addComponents(
                     new ActionRowBuilder().addComponents(
                         new TextInputBuilder()
                             .setCustomId('search_query')
@@ -2743,7 +5017,7 @@ return;
         
         // قائمة منسدلة للمطورين
         const selectMenu = new StringSelectMenuBuilder()
-            .setCustomId('owner_select')
+                            .setCustomId('owner_select')
             .setPlaceholder('اختر إجراء')
             .addOptions([
                 { label: 'إحصائيات البوت', value: 'bot_stats' },
@@ -4861,19 +7135,19 @@ async function createViolationPage(identity, userViolations, pageNumber, interac
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
     // عنوان "أبشر"
-    ctx.font = 'bold 28px Arial';
+    ctx.font = 'bold 28px sans-serif';
     ctx.fillStyle = '#179c4b';
     ctx.textAlign = 'right';
     ctx.fillText('أبشر', 170, 40);
     
     // عنوان "مخالفاتي"
-    ctx.font = 'bold 22px Arial';
+    ctx.font = 'bold 28px sans-serif';
     ctx.fillText('مخالفاتي', 170, 70);
     
     // مربع الاسم
     ctx.fillStyle = '#111222';
     ctx.fillRect(220, 30, 220, 38);
-    ctx.font = 'bold 22px Arial';
+    ctx.font = 'bold 28px sans-serif';
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -4902,7 +7176,7 @@ async function createViolationPage(identity, userViolations, pageNumber, interac
         const v = pageViolations[i];
         ctx.fillStyle = v.executed ? '#27ae60' : '#e74c3c';
         ctx.fillRect(60, y, 580, 38);
-        ctx.font = 'bold 17px Arial';
+        ctx.font = 'bold 17px sans-serif';
         ctx.fillStyle = '#fff';
         ctx.textAlign = 'left';
         ctx.fillText(`${v.title} - ${v.desc} - $${v.fine} - ${v.executed ? 'مسددة' : 'غير مسددة'}`, 70, y + 25);
@@ -4943,7 +7217,7 @@ async function createCrimePage(foundIdentity, userCrimes, pageNumber, interactio
     ctx.restore();
     
     // اسم العسكري بجانب صورته
-    ctx.font = 'bold 22px Arial';
+    ctx.font = 'bold 22px sans-serif';
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'left';
     ctx.fillText(officerName, 120, 70);
@@ -4966,20 +7240,20 @@ async function createCrimePage(foundIdentity, userCrimes, pageNumber, interactio
     ctx.restore();
     
     // اسم الشخص المطلوب بجانب صورته
-    ctx.font = 'bold 22px Arial';
+    ctx.font = 'bold 22px sans-serif';
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'right';
     ctx.fillText(foundIdentity.fullName, 780, 70);
     
     // عنوان "سجل الجرائم"
-    ctx.font = 'bold 32px Arial';
+    ctx.font = 'bold 32px sans-serif';
     ctx.fillStyle = '#00b894';
     ctx.textAlign = 'center';
     ctx.fillText('سجل الجرائم', 450, 150);
     
     // إذا لم توجد جرائم، عرض نص أحمر
     if (noCrimes) {
-        ctx.font = 'bold 28px Arial';
+        ctx.font = 'bold 28px sans-serif';
         ctx.fillStyle = '#e74c3c'; // لون أحمر
         ctx.textAlign = 'center';
         ctx.fillText('لا يوجد جرائم لهذا الشخص', 450, 250);
@@ -5005,13 +7279,13 @@ async function createCrimePage(foundIdentity, userCrimes, pageNumber, interactio
         ctx.strokeRect(x, y, 200, 80);
         
         // النصوص داخل المربع
-        ctx.font = 'bold 18px Arial';
+        ctx.font = 'bold 18px sans-serif';
         ctx.fillStyle = '#fff';
         ctx.textAlign = 'left';
         ctx.fillText(crime.title, x + 10, y + 25);
         
         // معالجة وصف الجريمة ليتناسب مع المربع
-        ctx.font = '12px Arial';
+        ctx.font = '12px sans-serif';
         ctx.fillStyle = '#f1f1f1';
         ctx.textAlign = 'left';
         
@@ -5047,7 +7321,7 @@ async function createCrimePage(foundIdentity, userCrimes, pageNumber, interactio
             ctx.fillText('...', x + 10, y + 42 + (maxLines * 12));
         }
         
-        ctx.font = 'bold 13px Arial';
+        ctx.font = 'bold 13px sans-serif';
         ctx.fillStyle = '#fff';
         ctx.fillText(`${crime.months} MONTHS | $${crime.fine}`, x + 10, y + 70);
         
@@ -5059,7 +7333,7 @@ async function createCrimePage(foundIdentity, userCrimes, pageNumber, interactio
     }
     
         // إضافة رقم الصفحة (فقط إذا كانت توجد جرائم)
-    ctx.font = 'bold 16px Arial';
+        ctx.font = 'bold 16px sans-serif';
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'center';
     ctx.fillText(`الصفحة ${pageNumber + 1} من ${Math.ceil(userCrimes.length / crimesPerPage)}`, 450, 450);
