@@ -21,7 +21,7 @@ async function generatePoliceTableImage(soldiers) {
   ctx.fillRect(0, 0, width, height);
 
   // العنوان
-  ctx.font = 'bold 24px Arial';
+  ctx.font = 'bold 24px sans-serif';
   ctx.fillStyle = '#fff';
   ctx.textAlign = 'left';
   ctx.fillText('Police Department', 30, 45);
@@ -34,14 +34,14 @@ async function generatePoliceTableImage(soldiers) {
   ctx.closePath();
   ctx.fillStyle = '#27ae60';
   ctx.fill();
-  ctx.font = 'bold 22px Arial';
+  ctx.font = 'bold 22px sans-serif';
   ctx.fillStyle = '#fff';
   ctx.textAlign = 'center';
   ctx.fillText(directCount.toString(), width - 60, 46);
   ctx.restore();
 
   // رؤوس الأعمدة
-  ctx.font = 'bold 18px Arial';
+  ctx.font = 'bold 18px sans-serif';
   ctx.fillStyle = '#b2bec3';
   ctx.textAlign = 'left';
   ctx.fillText('الحالة', 30, headerHeight);
@@ -49,7 +49,7 @@ async function generatePoliceTableImage(soldiers) {
   ctx.fillText('الاسم', 200, headerHeight);
 
   // الصفوف
-  ctx.font = '16px Arial';
+  ctx.font = '16px sans-serif';
   for (let i = 0; i < Math.max(count, 1); i++) {
     const y = headerHeight + 10 + i * rowHeight;
     // خلفية الصف
@@ -70,12 +70,12 @@ async function generatePoliceTableImage(soldiers) {
     ctx.fill();
     ctx.restore();
     // الكود
-    ctx.font = 'bold 17px Arial';
+    ctx.font = 'bold 17px sans-serif';
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'left';
     ctx.fillText(s.code, 85, y + rowHeight / 2);
     // الاسم
-    ctx.font = '17px Arial';
+    ctx.font = '17px sans-serif';
     ctx.fillStyle = '#fff';
     ctx.fillText(s.name, 170, y + rowHeight / 2);
   }
