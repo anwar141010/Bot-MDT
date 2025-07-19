@@ -22,7 +22,7 @@
   "discord.js": "^14.14.1",
   "dotenv": "^16.6.1",
   "fs": "^0.0.1-security",
-  "jimp": "^0.22.10"
+    "jimp": "^0.22.10",
   "canvas": "^2.11.2"
 },
   "devDependencies": {
